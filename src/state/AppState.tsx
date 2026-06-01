@@ -6,13 +6,9 @@ import {startWorker, stopWorker} from '../worker/foregroundService';
 import {
   AppConfig,
   clearAll,
-  clearDeviceConfig,
   getWorkerEnabled,
   loadConfig,
-  loadMemberAuth,
-  MemberAuth,
   saveConfig,
-  saveMemberAuth,
 } from '../storage/config';
 
 const DEFAULT_BASE_URL = BASE_URL ?? 'http://192.168.1.10:4008';
@@ -21,18 +17,12 @@ interface AppContextValue {
   ready: boolean;
   baseUrl: string;
   setBaseUrl: (url: string) => void;
-  member: MemberAuth | null;
   config: AppConfig | null;
   workerState: WorkerState;
 
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  unpair: () => Promise<void>;
   /** Claim a device by its code and make it the active worker device. */
   selectDevice: (code: string) => Promise<void>;
-  /** Create a new device slot then claim it. Throws DeviceLimitError if capped. */
-  createDevice: (name: string, phone?: string) => Promise<void>;
-  /** Drop the active device session (back to device selection). */
-  switchDevice: () => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
 }
@@ -42,7 +32,6 @@ const Ctx = createContext<AppContextValue | undefined>(undefined);
 export function AppStateProvider({children}: {children: React.ReactNode}) {
   const [ready, setReady] = useState(false);
   const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL);
-  const [member, setMember] = useState<MemberAuth | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [workerState, setWorkerState] = useState<WorkerState>(worker.getState());
 
@@ -50,12 +39,8 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     const unsub = worker.subscribe(setWorkerState);
     (async () => {
       await worker.init();
-      const savedMember = await loadMemberAuth();
       const savedConfig = await loadConfig();
-      if (savedMember) {
-        setMember(savedMember);
-        setBaseUrl(savedMember.baseUrl);
-      }
+      if (savedConfig) setBaseUrl(savedConfig.baseUrl);
       setConfig(savedConfig);
       // Auto-resume the worker if a device was active and running.
       if (savedConfig && (await getWorkerEnabled())) {
@@ -67,42 +52,12 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     return unsub;
   }, []);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const res = await ApiClient.login(baseUrl, {
-        memberEmail: email,
-        memberPassword: password,
-      });
-      const auth: MemberAuth = {
-        baseUrl,
-        memberToken: res.token,
-        memberId: res.member._id,
-        memberEmail: res.member.memberEmail,
-        memberName: [res.member.memberFirstName, res.member.memberLastName]
-          .filter(Boolean)
-          .join(' '),
-        memberDevices: res.member.memberDevices,
-      };
-      await saveMemberAuth(auth);
-      setMember(auth);
-    },
-    [baseUrl],
-  );
-
-  const logout = useCallback(async () => {
+  const unpair = useCallback(async () => {
     await stopWorker();
-    if (member) {
-      try {
-        await new ApiClient(member.baseUrl, member.memberToken).logout();
-      } catch {
-        // best-effort
-      }
-    }
     await clearAll();
     await worker.clear();
     setConfig(null);
-    setMember(null);
-  }, [member]);
+  }, []);
 
   /** Shared: claim a code → persist device config → point the worker at it. */
   const activateDevice = useCallback(
@@ -125,28 +80,6 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
 
   const selectDevice = useCallback((code: string) => activateDevice(code), [activateDevice]);
 
-  const createDevice = useCallback(
-    async (name: string, phone?: string) => {
-      if (!member) {
-        throw new Error('Not logged in');
-      }
-      const created = await new ApiClient(member.baseUrl, member.memberToken).createDevice({
-        name,
-        platform: 'ANDROID',
-        phone: phone || undefined,
-      });
-      await activateDevice(created.code);
-    },
-    [member, activateDevice],
-  );
-
-  const switchDevice = useCallback(async () => {
-    await stopWorker();
-    await clearDeviceConfig();
-    await worker.clear();
-    setConfig(null);
-  }, []);
-
   const start = useCallback(async () => {
     await startWorker();
   }, []);
@@ -161,14 +94,10 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
         ready,
         baseUrl,
         setBaseUrl,
-        member,
         config,
         workerState,
-        login,
-        logout,
+        unpair,
         selectDevice,
-        createDevice,
-        switchDevice,
         start,
         stop,
       }}>

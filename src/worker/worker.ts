@@ -12,6 +12,11 @@ import {appendLog} from '../storage/log';
 import {sendSms} from '../sms/DirectSms';
 import {hasSendSmsPermission} from '../permissions';
 import {getAppVersion, getBatteryLevel, getNetworkType} from '../device';
+import {
+  readPendingReports,
+  removePendingReport,
+  savePendingReport,
+} from '../storage/pendingReports';
 
 export interface WorkerState {
   running: boolean;
@@ -238,6 +243,7 @@ class Worker {
   /** Polls for jobs and sends them sequentially. Returns how long to sleep next. */
   private async pollAndSend(): Promise<number> {
     const limit = this.config!.sendLimitPerMinute || 60;
+    await this.flushPendingReports();
 
     // Permission gate: if SEND_SMS is denied we still poll, but fail-report every
     // claimed job so nothing is silently dropped (and the backend isn't left waiting).
@@ -250,12 +256,14 @@ class Worker {
         if (!this.enabled) {
           break;
         }
-        await this.reportWithRetry({
+        const report: ReportBody = {
           recipientId: job.recipientId,
           status: 'FAILED',
           failReason: 'sms_permission_denied',
           providerResponse: null,
-        });
+        };
+        await savePendingReport(report);
+        if (await this.reportWithRetry(report)) await removePendingReport(job.recipientId);
         await this.recordResult(job.phone, 'FAILED', 'sms_permission_denied', job.recipientId);
       }
       return jobs.length ? BUSY_SLEEP_MS : IDLE_SLEEP_MS;
@@ -287,12 +295,14 @@ class Worker {
       const result = await sendSms(job.phone, job.message);
       this.recordSend();
 
-      await this.reportWithRetry({
+      const report: ReportBody = {
         recipientId: job.recipientId,
         status: result.status,
         failReason: result.status === 'FAILED' ? result.failReason ?? 'send_error' : null,
         providerResponse: result.providerResponse ?? null,
-      });
+      };
+      await savePendingReport(report);
+      if (await this.reportWithRetry(report)) await removePendingReport(job.recipientId);
 
       await this.recordResult(
         job.phone,
@@ -331,12 +341,20 @@ class Worker {
     });
   }
 
-  private async reportWithRetry(body: ReportBody): Promise<void> {
+  private async flushPendingReports(): Promise<void> {
+    for (const report of await readPendingReports()) {
+      if (await this.reportWithRetry(report)) {
+        await removePendingReport(report.recipientId);
+      }
+    }
+  }
+
+  private async reportWithRetry(body: ReportBody): Promise<boolean> {
     for (let i = 0; i < REPORT_ATTEMPTS; i++) {
       try {
         // success:false ⇒ duplicate/late report; already handled, not an error.
         await this.client!.report(body);
-        return;
+        return true;
       } catch (e) {
         if (e instanceof UnauthorizedError) {
           throw e;
@@ -344,11 +362,12 @@ class Worker {
         if (i === REPORT_ATTEMPTS - 1) {
           // Give up — the backend reclaims unreported PROCESSING jobs after ~5 min.
           this.patch({lastError: `report failed: ${errMsg(e)}`});
-          return;
+          return false;
         }
         await this.sleep(1500 * (i + 1));
       }
     }
+    return false;
   }
 
   // ---- rate limiting (rolling minute + min spacing) ----

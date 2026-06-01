@@ -35,7 +35,7 @@ function timeAgo(ts: number | null): string {
 }
 
 export default function DashboardScreen({onOpenLog}: {onOpenLog: () => void}) {
-  const {config, workerState, start, stop, switchDevice, logout} = useAppState();
+  const {config, workerState, start, stop, unpair} = useAppState();
   const [busy, setBusy] = useState(false);
   const [batteryOptOk, setBatteryOptOk] = useState(true);
   const [, setTick] = useState(0);
@@ -79,33 +79,16 @@ export default function DashboardScreen({onOpenLog}: {onOpenLog: () => void}) {
     }
   };
 
-  const onSwitchDevice = () => {
-    Alert.alert('Switch device', 'Stop the worker and pick another device?', [
+  const onUnpair = () => {
+    Alert.alert('Unpair device', 'This stops the worker and removes the local device token. Continue?', [
       {text: 'Cancel', style: 'cancel'},
       {
-        text: 'Switch',
-        onPress: async () => {
-          setBusy(true);
-          try {
-            await switchDevice();
-          } finally {
-            setBusy(false);
-          }
-        },
-      },
-    ]);
-  };
-
-  const onLogout = () => {
-    Alert.alert('Logout', 'This stops the worker and signs you out. Continue?', [
-      {text: 'Cancel', style: 'cancel'},
-      {
-        text: 'Logout',
+        text: 'Unpair',
         style: 'destructive',
         onPress: async () => {
           setBusy(true);
           try {
-            await logout();
+            await unpair();
           } finally {
             setBusy(false);
           }
@@ -194,11 +177,8 @@ export default function DashboardScreen({onOpenLog}: {onOpenLog: () => void}) {
       </TouchableOpacity>
 
       <View style={styles.footerRow}>
-        <TouchableOpacity onPress={onSwitchDevice} disabled={busy}>
-          <Text style={styles.switchText}>Switch device</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onLogout} disabled={busy}>
-          <Text style={styles.unpairText}>Logout</Text>
+        <TouchableOpacity onPress={onUnpair} disabled={busy}>
+          <Text style={styles.unpairText}>Unpair device</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
