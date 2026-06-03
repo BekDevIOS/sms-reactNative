@@ -7,6 +7,7 @@ import React, {useState} from 'react';
 import {ActivityIndicator, StatusBar, StyleSheet, View} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AppStateProvider, useAppState} from './src/state/AppState';
+import {ErrorBoundary} from './src/components/ErrorBoundary';
 import LoginScreen from './src/screens/LoginScreen';
 import DeviceSelectScreen from './src/screens/DeviceSelectScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -38,12 +39,14 @@ function Root() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-      <AppStateProvider>
-        <Root />
-      </AppStateProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+        <AppStateProvider>
+          <Root />
+        </AppStateProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

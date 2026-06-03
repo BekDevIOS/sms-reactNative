@@ -8,3 +8,17 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# --- App native module (DirectSmsModule) bridged to JS via reflection ---
+-keep class com.smssender.** { *; }
+
+# --- React Native / Hermes (most RN libs ship consumer rules, these are belt-and-suspenders) ---
+-keep,allowobfuscation @interface com.facebook.proguard.annotations.DoNotStrip
+-keep @com.facebook.proguard.annotations.DoNotStrip class * { *; }
+-keepclassmembers class * {
+    @com.facebook.proguard.annotations.DoNotStrip *;
+}
+-keep class com.facebook.hermes.** { *; }
+-keep class com.facebook.jni.** { *; }
+-dontwarn com.facebook.react.**
+

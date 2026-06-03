@@ -15,7 +15,9 @@ import {
   saveMemberAuth,
 } from '../storage/config';
 
-const DEFAULT_BASE_URL = BASE_URL ?? 'http://192.168.1.10:4008';
+// Production default points at the HTTPS API. For LAN development, set BASE_URL
+// in .env (e.g. http://192.168.1.10:4008) — release builds forbid cleartext.
+const DEFAULT_BASE_URL = BASE_URL ?? 'https://api.carmoa.store';
 
 interface AppContextValue {
   ready: boolean;
