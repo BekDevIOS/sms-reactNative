@@ -8,17 +8,15 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
 } from 'react-native';
 import {InvalidCredentialsError} from '../api/client';
 import {useAppState} from '../state/AppState';
 import {colors} from '../theme';
 
 export default function LoginScreen() {
-  const {baseUrl, setBaseUrl, login} = useAppState();
+  const {login} = useAppState();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [editServer, setEditServer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +34,7 @@ export default function LoginScreen() {
       if (err instanceof InvalidCredentialsError) {
         setError('Wrong email or password.');
       } else {
-        setError('Could not reach the server. Check the address and your network.');
+        setError('Could not reach the server. Check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -50,27 +48,6 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>SMS Sender</Text>
         <Text style={styles.subtitle}>Sign in with your account.</Text>
-
-        <View style={styles.serverRow}>
-          <Text style={styles.serverLabel}>Server</Text>
-          <TouchableOpacity onPress={() => setEditServer(v => !v)}>
-            <Text style={styles.serverToggle}>{editServer ? 'Done' : 'Change'}</Text>
-          </TouchableOpacity>
-        </View>
-        {editServer ? (
-          <TextInput
-            style={styles.input}
-            value={baseUrl}
-            onChangeText={setBaseUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            placeholder="http://192.168.1.10:4008"
-            placeholderTextColor={colors.muted}
-          />
-        ) : (
-          <Text style={styles.serverValue}>{baseUrl}</Text>
-        )}
 
         <Text style={styles.label}>Email</Text>
         <TextInput
@@ -90,7 +67,7 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          placeholder="••••••••"
+          placeholder="Password"
           placeholderTextColor={colors.muted}
         />
 
@@ -108,8 +85,8 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <Text style={styles.hint}>
-          Use the email and password of your account on the campaign backend. After signing in
-          you can pick or create a sender device (subject to your device limit).
+          The app connects securely to the production backend. After signing in you can pick
+          or create a sender device.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -121,16 +98,6 @@ const styles = StyleSheet.create({
   container: {padding: 24, paddingTop: 64},
   title: {fontSize: 30, fontWeight: '700', color: colors.text},
   subtitle: {fontSize: 15, color: colors.muted, marginTop: 6, marginBottom: 20},
-  serverRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  serverLabel: {fontSize: 13, color: colors.muted},
-  serverToggle: {fontSize: 13, color: colors.primary, fontWeight: '600'},
-  serverValue: {fontSize: 14, color: colors.text},
   label: {fontSize: 13, color: colors.muted, marginBottom: 6, marginTop: 16},
   input: {
     backgroundColor: colors.card,

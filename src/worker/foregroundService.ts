@@ -22,27 +22,21 @@ async function ensureChannel(): Promise<void> {
 /** (Re)display the persistent foreground notification reflecting current worker state. */
 async function updateNotification(): Promise<void> {
   const s = worker.getState();
-  const body = s.running
-    ? `Sending… ${s.counters.sent} sent · ${s.counters.failed} failed`
-    : 'Idle';
-  try {
-    await notifee.displayNotification({
-      id: NOTIFICATION_ID,
-      title: s.status === 'ONLINE' ? 'SMS Sender — ONLINE' : 'SMS Sender',
-      body,
-      android: {
-        channelId: CHANNEL_ID,
-        asForegroundService: true,
-        ongoing: true,
-        smallIcon: 'ic_launcher',
-        importance: AndroidImportance.LOW,
-        onlyAlertOnce: true,
-      },
-    });
-  } catch {
-    // Notification display can fail if POST_NOTIFICATIONS is denied — the worker
-    // still runs; we just can't show progress.
-  }
+  const body = s.running ? `Sending: ${s.counters.sent} sent / ${s.counters.failed} failed` : 'Idle';
+
+  await notifee.displayNotification({
+    id: NOTIFICATION_ID,
+    title: s.status === 'ONLINE' ? 'SMS Sender ONLINE' : 'SMS Sender',
+    body,
+    android: {
+      channelId: CHANNEL_ID,
+      asForegroundService: true,
+      ongoing: true,
+      smallIcon: 'ic_stat_sms',
+      importance: AndroidImportance.LOW,
+      onlyAlertOnce: true,
+    },
+  });
 }
 
 /**
@@ -54,7 +48,7 @@ export function registerForegroundService(): void {
     () =>
       new Promise<void>(resolve => {
         worker.setOnProgress(() => {
-          updateNotification();
+          updateNotification().catch(() => {});
         });
         worker
           .run()
@@ -70,11 +64,18 @@ export function registerForegroundService(): void {
 /** Starts the worker: persists the enabled flag and brings up the foreground service. */
 export async function startWorker(): Promise<void> {
   await ensureChannel();
-  await setWorkerEnabled(true);
+  await worker.waitUntilStopped();
   worker.setEnabled(true);
   // Displaying a notification with asForegroundService:true starts the service,
   // which invokes the registered task (worker.run()).
-  await updateNotification();
+  try {
+    await updateNotification();
+    await setWorkerEnabled(true);
+  } catch (e) {
+    worker.setEnabled(false);
+    await setWorkerEnabled(false);
+    throw e;
+  }
 }
 
 /** Stops the worker loop, sends OFFLINE heartbeat, and tears down the service. */

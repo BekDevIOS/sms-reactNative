@@ -61,10 +61,25 @@ export default function DashboardScreen({onOpenLog}: {onOpenLog: () => void}) {
       if (!perms.sms) {
         Alert.alert(
           'SMS permission required',
-          'Without SEND_SMS the worker will mark every job as failed. Grant it in Settings, then start again.',
+          'Grant SMS permission in Settings, then start the worker again.',
         );
+        return;
+      }
+      if (!perms.notifications) {
+        Alert.alert(
+          'Notification permission required',
+          'Android needs the persistent notification to keep SMS Sender running in the background.',
+        );
+        return;
       }
       await start();
+    } catch (e) {
+      Alert.alert(
+        'Worker did not start',
+        e instanceof Error
+          ? e.message
+          : 'Could not start the foreground service. Check notification permission and battery settings.',
+      );
     } finally {
       setBusy(false);
     }
@@ -135,7 +150,6 @@ export default function DashboardScreen({onOpenLog}: {onOpenLog: () => void}) {
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <Text style={styles.deviceName}>{config?.deviceName ?? 'Device'}</Text>
-          <Text style={styles.server}>{config?.baseUrl}</Text>
         </View>
         <View style={[styles.statusPill, online ? styles.pillOnline : styles.pillOffline]}>
           <Text style={styles.statusText}>{s.status}</Text>
@@ -231,7 +245,6 @@ const styles = StyleSheet.create({
   headerRow: {flexDirection: 'row', alignItems: 'center'},
   headerLeft: {flex: 1},
   deviceName: {fontSize: 24, fontWeight: '700', color: colors.text},
-  server: {fontSize: 13, color: colors.muted, marginTop: 2},
   statusPill: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999},
   pillOnline: {backgroundColor: 'rgba(34,197,94,0.18)'},
   pillOffline: {backgroundColor: 'rgba(139,147,163,0.18)'},

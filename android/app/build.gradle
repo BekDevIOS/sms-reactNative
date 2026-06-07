@@ -72,6 +72,16 @@ def enableProguardInReleaseBuilds = true
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def releaseKeystoreProperties = new Properties()
+def releaseKeystorePropertiesFile = rootProject.file("local.properties")
+if (releaseKeystorePropertiesFile.exists()) {
+    releaseKeystorePropertiesFile.withInputStream { releaseKeystoreProperties.load(it) }
+}
+def hasReleaseSigning = releaseKeystoreProperties.containsKey('NOVASMS_STORE_FILE') &&
+        releaseKeystoreProperties.containsKey('NOVASMS_STORE_PASSWORD') &&
+        releaseKeystoreProperties.containsKey('NOVASMS_KEY_ALIAS') &&
+        releaseKeystoreProperties.containsKey('NOVASMS_KEY_PASSWORD')
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -95,11 +105,11 @@ android {
         // Release signing reads secrets from local.properties / ~/.gradle/gradle.properties
         // (NEVER committed). See android/RELEASE.md.
         release {
-            if (project.hasProperty('NOVASMS_STORE_FILE')) {
-                storeFile file(NOVASMS_STORE_FILE)
-                storePassword NOVASMS_STORE_PASSWORD
-                keyAlias NOVASMS_KEY_ALIAS
-                keyPassword NOVASMS_KEY_PASSWORD
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystoreProperties['NOVASMS_STORE_FILE'])
+                storePassword releaseKeystoreProperties['NOVASMS_STORE_PASSWORD']
+                keyAlias releaseKeystoreProperties['NOVASMS_KEY_ALIAS']
+                keyPassword releaseKeystoreProperties['NOVASMS_KEY_PASSWORD']
             }
         }
     }
@@ -112,7 +122,7 @@ android {
         release {
             // Use the real release key when configured; otherwise fall back to debug
             // so local release builds still work without the production keystore.
-            signingConfig project.hasProperty('NOVASMS_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"

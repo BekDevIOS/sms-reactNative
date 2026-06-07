@@ -1,5 +1,4 @@
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
-import {BASE_URL} from '@env';
 import {ApiClient} from '../api/client';
 import {worker, WorkerState} from '../worker/worker';
 import {startWorker, stopWorker} from '../worker/foregroundService';
@@ -13,16 +12,13 @@ import {
   MemberAuth,
   saveConfig,
   saveMemberAuth,
+  setWorkerEnabled,
 } from '../storage/config';
 
-// Production default points at the HTTPS API. For LAN development, set BASE_URL
-// in .env (e.g. http://192.168.1.10:4008) — release builds forbid cleartext.
-const DEFAULT_BASE_URL = BASE_URL ?? 'https://api.carmoa.store';
+const PRODUCTION_BASE_URL = 'https://api.carmoa.store';
 
 interface AppContextValue {
   ready: boolean;
-  baseUrl: string;
-  setBaseUrl: (url: string) => void;
   member: MemberAuth | null;
   config: AppConfig | null;
   workerState: WorkerState;
@@ -43,7 +39,6 @@ const Ctx = createContext<AppContextValue | undefined>(undefined);
 
 export function AppStateProvider({children}: {children: React.ReactNode}) {
   const [ready, setReady] = useState(false);
-  const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL);
   const [member, setMember] = useState<MemberAuth | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [workerState, setWorkerState] = useState<WorkerState>(worker.getState());
@@ -52,17 +47,34 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     const unsub = worker.subscribe(setWorkerState);
     (async () => {
       await worker.init();
-      const savedMember = await loadMemberAuth();
-      const savedConfig = await loadConfig();
+      const rawMember = await loadMemberAuth();
+      const rawConfig = await loadConfig();
+      const savedMember = rawMember
+        ? {...rawMember, baseUrl: PRODUCTION_BASE_URL}
+        : null;
+      const savedConfig = rawConfig
+        ? {...rawConfig, baseUrl: PRODUCTION_BASE_URL}
+        : null;
       if (savedMember) {
+        if (rawMember?.baseUrl !== PRODUCTION_BASE_URL) {
+          await saveMemberAuth(savedMember);
+        }
         setMember(savedMember);
-        setBaseUrl(savedMember.baseUrl);
+      }
+      if (savedConfig && rawConfig?.baseUrl !== PRODUCTION_BASE_URL) {
+        await saveConfig(savedConfig);
       }
       setConfig(savedConfig);
+      if (savedConfig) {
+        await worker.configure(savedConfig);
+      }
       // Auto-resume the worker if a device was active and running.
       if (savedConfig && (await getWorkerEnabled())) {
-        await worker.configure(savedConfig);
-        await startWorker();
+        try {
+          await startWorker();
+        } catch {
+          await setWorkerEnabled(false);
+        }
       }
       setReady(true);
     })();
@@ -71,12 +83,12 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const res = await ApiClient.login(baseUrl, {
+      const res = await ApiClient.login(PRODUCTION_BASE_URL, {
         memberEmail: email,
         memberPassword: password,
       });
       const auth: MemberAuth = {
-        baseUrl,
+        baseUrl: PRODUCTION_BASE_URL,
         memberToken: res.token,
         memberId: res.member._id,
         memberEmail: res.member.memberEmail,
@@ -88,7 +100,7 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       await saveMemberAuth(auth);
       setMember(auth);
     },
-    [baseUrl],
+    [],
   );
 
   const logout = useCallback(async () => {
@@ -109,9 +121,9 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
   /** Shared: claim a code → persist device config → point the worker at it. */
   const activateDevice = useCallback(
     async (code: string) => {
-      const res = await ApiClient.claim(baseUrl, code);
+      const res = await ApiClient.claim(PRODUCTION_BASE_URL, code);
       const cfg: AppConfig = {
-        baseUrl,
+        baseUrl: PRODUCTION_BASE_URL,
         token: res.token,
         deviceId: res.device.deviceId,
         deviceName: res.device.name,
@@ -122,7 +134,7 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       await worker.resetCounters();
       setConfig(cfg);
     },
-    [baseUrl],
+    [],
   );
 
   const selectDevice = useCallback((code: string) => activateDevice(code), [activateDevice]);
@@ -161,8 +173,6 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     <Ctx.Provider
       value={{
         ready,
-        baseUrl,
-        setBaseUrl,
         member,
         config,
         workerState,
