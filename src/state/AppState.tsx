@@ -1,5 +1,6 @@
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {ApiClient} from '../api/client';
+import type {MemberRole, RegisterBody, UpdateMeBody} from '../api/types';
 import {worker, WorkerState} from '../worker/worker';
 import {startWorker, stopWorker} from '../worker/foregroundService';
 import {
@@ -17,19 +18,49 @@ import {
 
 const PRODUCTION_BASE_URL = 'https://api.carmoa.store';
 
+function toMemberAuth(
+  baseUrl: string,
+  token: string,
+  m: {
+    _id: string;
+    memberEmail: string;
+    memberFirstName: string;
+    memberLastName?: string;
+    memberDevices: number;
+    memberRole?: MemberRole;
+    memberPhone?: string;
+    memberCompanyName?: string;
+    memberImage?: string;
+  },
+): MemberAuth {
+  return {
+    baseUrl,
+    memberToken: token,
+    memberId: m._id,
+    memberEmail: m.memberEmail,
+    memberName: [m.memberFirstName, m.memberLastName].filter(Boolean).join(' '),
+    memberDevices: m.memberDevices,
+    memberRole: (m.memberRole as MemberRole) ?? 'USER',
+    memberPhone: m.memberPhone,
+    memberCompanyName: m.memberCompanyName,
+    memberImage: m.memberImage,
+  };
+}
+
 interface AppContextValue {
   ready: boolean;
   member: MemberAuth | null;
   config: AppConfig | null;
   workerState: WorkerState;
+  isAdmin: boolean;
 
   login: (email: string, password: string) => Promise<void>;
+  register: (body: RegisterBody) => Promise<void>;
+  refreshMe: () => Promise<void>;
+  updateMe: (body: UpdateMeBody) => Promise<void>;
   logout: () => Promise<void>;
-  /** Claim a device by its code and make it the active worker device. */
   selectDevice: (code: string) => Promise<void>;
-  /** Create a new device slot then claim it. Throws DeviceLimitError if capped. */
   createDevice: (name: string, phone?: string) => Promise<void>;
-  /** Drop the active device session (back to device selection). */
   switchDevice: () => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -49,12 +80,9 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       await worker.init();
       const rawMember = await loadMemberAuth();
       const rawConfig = await loadConfig();
-      const savedMember = rawMember
-        ? {...rawMember, baseUrl: PRODUCTION_BASE_URL}
-        : null;
-      const savedConfig = rawConfig
-        ? {...rawConfig, baseUrl: PRODUCTION_BASE_URL}
-        : null;
+      const savedMember = rawMember ? {...rawMember, baseUrl: PRODUCTION_BASE_URL} : null;
+      const savedConfig = rawConfig ? {...rawConfig, baseUrl: PRODUCTION_BASE_URL} : null;
+
       if (savedMember) {
         if (rawMember?.baseUrl !== PRODUCTION_BASE_URL) {
           await saveMemberAuth(savedMember);
@@ -68,7 +96,6 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       if (savedConfig) {
         await worker.configure(savedConfig);
       }
-      // Auto-resume the worker if a device was active and running.
       if (savedConfig && (await getWorkerEnabled())) {
         try {
           await startWorker();
@@ -81,33 +108,51 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     return unsub;
   }, []);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const res = await ApiClient.login(PRODUCTION_BASE_URL, {
-        memberEmail: email,
-        memberPassword: password,
-      });
-      const auth: MemberAuth = {
-        baseUrl: PRODUCTION_BASE_URL,
-        memberToken: res.token,
-        memberId: res.member._id,
-        memberEmail: res.member.memberEmail,
-        memberName: [res.member.memberFirstName, res.member.memberLastName]
-          .filter(Boolean)
-          .join(' '),
-        memberDevices: res.member.memberDevices,
-      };
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await ApiClient.login(PRODUCTION_BASE_URL, {
+      memberEmail: email,
+      memberPassword: password,
+    });
+    const auth = toMemberAuth(PRODUCTION_BASE_URL, res.token, res.member);
+    await saveMemberAuth(auth);
+    setMember(auth);
+  }, []);
+
+  const register = useCallback(async (body: RegisterBody) => {
+    const res = await ApiClient.register(PRODUCTION_BASE_URL, body);
+    const auth = toMemberAuth(PRODUCTION_BASE_URL, res.token, res.member);
+    await saveMemberAuth(auth);
+    setMember(auth);
+  }, []);
+
+  const refreshMe = useCallback(async () => {
+    if (!member) {
+      return;
+    }
+    const me = await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).getMe();
+    const auth = toMemberAuth(PRODUCTION_BASE_URL, member.memberToken, me);
+    await saveMemberAuth(auth);
+    setMember(auth);
+  }, [member]);
+
+  const updateMe = useCallback(
+    async (body: UpdateMeBody) => {
+      if (!member) {
+        return;
+      }
+      const me = await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).updateMe(body);
+      const auth = toMemberAuth(PRODUCTION_BASE_URL, member.memberToken, me);
       await saveMemberAuth(auth);
       setMember(auth);
     },
-    [],
+    [member],
   );
 
   const logout = useCallback(async () => {
     await stopWorker();
     if (member) {
       try {
-        await new ApiClient(member.baseUrl, member.memberToken).logout();
+        await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).logout();
       } catch {
         // best-effort
       }
@@ -118,24 +163,20 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     setMember(null);
   }, [member]);
 
-  /** Shared: claim a code → persist device config → point the worker at it. */
-  const activateDevice = useCallback(
-    async (code: string) => {
-      const res = await ApiClient.claim(PRODUCTION_BASE_URL, code);
-      const cfg: AppConfig = {
-        baseUrl: PRODUCTION_BASE_URL,
-        token: res.token,
-        deviceId: res.device.deviceId,
-        deviceName: res.device.name,
-        sendLimitPerMinute: res.device.sendLimitPerMinute ?? 60,
-      };
-      await saveConfig(cfg);
-      await worker.configure(cfg);
-      await worker.resetCounters();
-      setConfig(cfg);
-    },
-    [],
-  );
+  const activateDevice = useCallback(async (code: string) => {
+    const res = await ApiClient.claim(PRODUCTION_BASE_URL, code);
+    const cfg: AppConfig = {
+      baseUrl: PRODUCTION_BASE_URL,
+      token: res.token,
+      deviceId: res.device.deviceId,
+      deviceName: res.device.name,
+      sendLimitPerMinute: res.device.sendLimitPerMinute ?? 60,
+    };
+    await saveConfig(cfg);
+    await worker.configure(cfg);
+    await worker.resetCounters();
+    setConfig(cfg);
+  }, []);
 
   const selectDevice = useCallback((code: string) => activateDevice(code), [activateDevice]);
 
@@ -144,7 +185,7 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       if (!member) {
         throw new Error('Not logged in');
       }
-      const created = await new ApiClient(member.baseUrl, member.memberToken).createDevice({
+      const created = await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).createDevice({
         name,
         platform: 'ANDROID',
         phone: phone || undefined,
@@ -169,6 +210,8 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     await stopWorker();
   }, []);
 
+  const isAdmin = member?.memberRole === 'ADMIN' || member?.memberRole === 'OWNER';
+
   return (
     <Ctx.Provider
       value={{
@@ -176,7 +219,11 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
         member,
         config,
         workerState,
+        isAdmin,
         login,
+        register,
+        refreshMe,
+        updateMe,
         logout,
         selectDevice,
         createDevice,
