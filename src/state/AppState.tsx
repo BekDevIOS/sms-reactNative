@@ -1,6 +1,7 @@
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {BASE_URL} from '@env';
 import {ApiClient} from '../api/client';
+import type {MemberRole, RegisterBody, UpdateMeBody} from '../api/types';
 import {worker, WorkerState} from '../worker/worker';
 import {startWorker, stopWorker} from '../worker/foregroundService';
 import {
@@ -19,6 +20,36 @@ import {
 // in .env (e.g. http://192.168.1.10:4008) — release builds forbid cleartext.
 const DEFAULT_BASE_URL = BASE_URL ?? 'https://api.carmoa.store';
 
+/** Builds the persisted MemberAuth from an auth/me response. Role defaults to USER. */
+function toMemberAuth(
+  baseUrl: string,
+  token: string,
+  m: {
+    _id: string;
+    memberEmail: string;
+    memberFirstName: string;
+    memberLastName?: string;
+    memberDevices: number;
+    memberRole?: MemberRole;
+    memberPhone?: string;
+    memberCompanyName?: string;
+    memberImage?: string;
+  },
+): MemberAuth {
+  return {
+    baseUrl,
+    memberToken: token,
+    memberId: m._id,
+    memberEmail: m.memberEmail,
+    memberName: [m.memberFirstName, m.memberLastName].filter(Boolean).join(' '),
+    memberDevices: m.memberDevices,
+    memberRole: (m.memberRole as MemberRole) ?? 'USER',
+    memberPhone: m.memberPhone,
+    memberCompanyName: m.memberCompanyName,
+    memberImage: m.memberImage,
+  };
+}
+
 interface AppContextValue {
   ready: boolean;
   baseUrl: string;
@@ -26,8 +57,15 @@ interface AppContextValue {
   member: MemberAuth | null;
   config: AppConfig | null;
   workerState: WorkerState;
+  /** True when the logged-in member is ADMIN or OWNER. */
+  isAdmin: boolean;
 
   login: (email: string, password: string) => Promise<void>;
+  register: (body: RegisterBody) => Promise<void>;
+  /** Re-fetch /member/me and update the cached member (e.g. after editing profile). */
+  refreshMe: () => Promise<void>;
+  /** POST /member/me then update the cached member. */
+  updateMe: (body: UpdateMeBody) => Promise<void>;
   logout: () => Promise<void>;
   /** Claim a device by its code and make it the active worker device. */
   selectDevice: (code: string) => Promise<void>;
@@ -75,20 +113,44 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
         memberEmail: email,
         memberPassword: password,
       });
-      const auth: MemberAuth = {
-        baseUrl,
-        memberToken: res.token,
-        memberId: res.member._id,
-        memberEmail: res.member.memberEmail,
-        memberName: [res.member.memberFirstName, res.member.memberLastName]
-          .filter(Boolean)
-          .join(' '),
-        memberDevices: res.member.memberDevices,
-      };
+      const auth = toMemberAuth(baseUrl, res.token, res.member);
       await saveMemberAuth(auth);
       setMember(auth);
     },
     [baseUrl],
+  );
+
+  const register = useCallback(
+    async (body: RegisterBody) => {
+      const res = await ApiClient.register(baseUrl, body);
+      const auth = toMemberAuth(baseUrl, res.token, res.member);
+      await saveMemberAuth(auth);
+      setMember(auth);
+    },
+    [baseUrl],
+  );
+
+  const refreshMe = useCallback(async () => {
+    if (!member) {
+      return;
+    }
+    const me = await new ApiClient(member.baseUrl, member.memberToken).getMe();
+    const auth = toMemberAuth(member.baseUrl, member.memberToken, me);
+    await saveMemberAuth(auth);
+    setMember(auth);
+  }, [member]);
+
+  const updateMe = useCallback(
+    async (body: UpdateMeBody) => {
+      if (!member) {
+        return;
+      }
+      const me = await new ApiClient(member.baseUrl, member.memberToken).updateMe(body);
+      const auth = toMemberAuth(member.baseUrl, member.memberToken, me);
+      await saveMemberAuth(auth);
+      setMember(auth);
+    },
+    [member],
   );
 
   const logout = useCallback(async () => {
@@ -157,6 +219,8 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     await stopWorker();
   }, []);
 
+  const isAdmin = member?.memberRole === 'ADMIN' || member?.memberRole === 'OWNER';
+
   return (
     <Ctx.Provider
       value={{
@@ -166,7 +230,11 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
         member,
         config,
         workerState,
+        isAdmin,
         login,
+        register,
+        refreshMe,
+        updateMe,
         logout,
         selectDevice,
         createDevice,

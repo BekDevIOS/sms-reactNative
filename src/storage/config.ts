@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type {MemberRole} from '../api/types';
 
 /** Member session — obtained from email/password login. Used for device management. */
 export interface MemberAuth {
@@ -8,6 +9,11 @@ export interface MemberAuth {
   memberEmail: string;
   memberName: string;
   memberDevices: number;
+  /** Defaults to 'USER' for sessions saved before role was persisted. */
+  memberRole: MemberRole;
+  memberPhone?: string;
+  memberCompanyName?: string;
+  memberImage?: string;
 }
 
 /** Device session — obtained by claiming a device's code. Used by the worker. */

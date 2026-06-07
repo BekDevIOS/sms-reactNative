@@ -1,60 +1,28 @@
 /**
- * SMS Sender — Android companion app.
+ * SMSAPP.UZ — Android app.
  * @format
  */
 
-import React, {useState} from 'react';
-import {ActivityIndicator, StatusBar, StyleSheet, View} from 'react-native';
+import React from 'react';
+import {StatusBar} from 'react-native';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {AppStateProvider, useAppState} from './src/state/AppState';
+import {AppStateProvider} from './src/state/AppState';
 import {ErrorBoundary} from './src/components/ErrorBoundary';
-import LoginScreen from './src/screens/LoginScreen';
-import DeviceSelectScreen from './src/screens/DeviceSelectScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
-import LogScreen from './src/screens/LogScreen';
+import {RootNavigator} from './src/navigation/RootNavigator';
 import {colors} from './src/theme';
-
-function Root() {
-  const {ready, member, config} = useAppState();
-  const [showLog, setShowLog] = useState(false);
-
-  if (!ready) {
-    return (
-      <View style={styles.splash}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
-  }
-  if (!member) {
-    return <LoginScreen />;
-  }
-  if (!config) {
-    return <DeviceSelectScreen />;
-  }
-  if (showLog) {
-    return <LogScreen onBack={() => setShowLog(false)} />;
-  }
-  return <DashboardScreen onOpenLog={() => setShowLog(true)} />;
-}
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-        <AppStateProvider>
-          <Root />
-        </AppStateProvider>
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{flex: 1}}>
+        <SafeAreaProvider>
+          <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+          <AppStateProvider>
+            <RootNavigator />
+          </AppStateProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }
-
-const styles = StyleSheet.create({
-  splash: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

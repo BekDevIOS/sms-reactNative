@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -10,11 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {InvalidCredentialsError} from '../api/client';
-import {useAppState} from '../state/AppState';
-import {colors} from '../theme';
+import {useAppState} from '../../state/AppState';
+import {errorMessage} from '../../lib/errors';
+import {Button} from '../../components/ui/primitives';
+import {colors, font, radius, spacing} from '../../theme';
+import type {AuthStackParamList} from '../../navigation/types';
 
-export default function LoginScreen() {
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+
+export default function LoginScreen({navigation}: Props) {
   const {baseUrl, setBaseUrl, login} = useAppState();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,18 +30,14 @@ export default function LoginScreen() {
     setError(null);
     const e = email.trim();
     if (!e || !password) {
-      setError('Enter your email and password.');
+      setError('Email va parolni kiriting.');
       return;
     }
     setLoading(true);
     try {
       await login(e, password);
     } catch (err) {
-      if (err instanceof InvalidCredentialsError) {
-        setError('Wrong email or password.');
-      } else {
-        setError('Could not reach the server. Check the address and your network.');
-      }
+      setError(errorMessage(err, 'Serverga ulanib bo‘lmadi. Manzil va internetni tekshiring.'));
     } finally {
       setLoading(false);
     }
@@ -48,13 +48,13 @@ export default function LoginScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>SMS Sender</Text>
-        <Text style={styles.subtitle}>Sign in with your account.</Text>
+        <Text style={styles.title}>SMSAPP.UZ</Text>
+        <Text style={styles.subtitle}>Hisobingiz bilan kiring.</Text>
 
         <View style={styles.serverRow}>
           <Text style={styles.serverLabel}>Server</Text>
           <TouchableOpacity onPress={() => setEditServer(v => !v)}>
-            <Text style={styles.serverToggle}>{editServer ? 'Done' : 'Change'}</Text>
+            <Text style={styles.serverToggle}>{editServer ? 'Tayyor' : 'O‘zgartirish'}</Text>
           </TouchableOpacity>
         </View>
         {editServer ? (
@@ -84,7 +84,7 @@ export default function LoginScreen() {
           placeholderTextColor={colors.muted}
         />
 
-        <Text style={styles.label}>Password</Text>
+        <Text style={styles.label}>Parol</Text>
         <TextInput
           style={styles.input}
           value={password}
@@ -96,21 +96,11 @@ export default function LoginScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={onLogin}
-          disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign in</Text>
-          )}
-        </TouchableOpacity>
+        <Button title="Kirish" onPress={onLogin} loading={loading} style={styles.button} />
 
-        <Text style={styles.hint}>
-          Use the email and password of your account on the campaign backend. After signing in
-          you can pick or create a sender device (subject to your device limit).
-        </Text>
+        <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('Register')}>
+          <Text style={styles.linkText}>Hisobingiz yo‘qmi? Ro‘yxatdan o‘ting</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -118,39 +108,32 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   flex: {flex: 1, backgroundColor: colors.bg},
-  container: {padding: 24, paddingTop: 64},
-  title: {fontSize: 30, fontWeight: '700', color: colors.text},
-  subtitle: {fontSize: 15, color: colors.muted, marginTop: 6, marginBottom: 20},
+  container: {padding: spacing.xxl, paddingTop: 64},
+  title: {fontSize: 30, fontWeight: '800', color: colors.text},
+  subtitle: {fontSize: font.md, color: colors.muted, marginTop: 6, marginBottom: spacing.xl},
   serverRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
     marginBottom: 6,
   },
-  serverLabel: {fontSize: 13, color: colors.muted},
-  serverToggle: {fontSize: 13, color: colors.primary, fontWeight: '600'},
-  serverValue: {fontSize: 14, color: colors.text},
-  label: {fontSize: 13, color: colors.muted, marginBottom: 6, marginTop: 16},
+  serverLabel: {fontSize: font.sm, color: colors.muted},
+  serverToggle: {fontSize: font.sm, color: colors.primary, fontWeight: '600'},
+  serverValue: {fontSize: font.sm, color: colors.text},
+  label: {fontSize: font.sm, color: colors.muted, marginBottom: 6, marginTop: spacing.lg},
   input: {
     backgroundColor: colors.card,
-    borderRadius: 10,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: font.md,
     color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  error: {color: colors.danger, marginTop: 16},
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  buttonDisabled: {opacity: 0.6},
-  buttonText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  hint: {color: colors.muted, fontSize: 12, marginTop: 24, lineHeight: 18},
+  error: {color: colors.danger, marginTop: spacing.lg},
+  button: {marginTop: spacing.xxl},
+  linkRow: {alignItems: 'center', paddingVertical: spacing.lg, marginTop: spacing.sm},
+  linkText: {color: colors.primary, fontSize: font.sm, fontWeight: '600'},
 });

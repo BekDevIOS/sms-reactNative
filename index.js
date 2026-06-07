@@ -2,6 +2,9 @@
  * @format
  */
 
+// Must be the very first import so gesture-handler can install its native
+// handlers before anything else (required by React Navigation's drawer).
+import 'react-native-gesture-handler';
 import {AppRegistry} from 'react-native';
 import App from './App';
 import {name as appName} from './app.json';

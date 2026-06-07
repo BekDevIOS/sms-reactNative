@@ -10,5 +10,7 @@ module.exports = {
         allowUndefined: true,
       },
     ],
+    // react-native-reanimated/plugin MUST be listed last.
+    'react-native-reanimated/plugin',
   ],
 };
