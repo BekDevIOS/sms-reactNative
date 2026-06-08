@@ -1,12 +1,7 @@
 import React from 'react';
 import {ActivityIndicator, StyleSheet, Text, TouchableOpacity} from 'react-native';
-import {colors, spacing} from '../../theme';
+import {colors, font, spacing} from '../../theme';
 
-/**
- * The pink floating action button that toggles the SMS-sending worker.
- * Shows ▶ when stopped and ■ when running. Disabled (greyed) when no device
- * is configured; tapping then routes the user to device selection.
- */
 export function WorkerFab({
   running,
   busy,
@@ -27,7 +22,7 @@ export function WorkerFab({
       {busy ? (
         <ActivityIndicator color="#fff" />
       ) : (
-        <Text style={styles.icon}>{running ? '■' : '▶'}</Text>
+        <Text style={styles.icon}>{running ? 'STOP' : 'GO'}</Text>
       )}
     </TouchableOpacity>
   );
@@ -51,5 +46,5 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 4},
   },
   fabDisabled: {backgroundColor: colors.muted, opacity: 0.7},
-  icon: {color: '#fff', fontSize: 26, fontWeight: '800', marginLeft: 2},
+  icon: {color: '#fff', fontSize: font.xs, fontWeight: '800', letterSpacing: 0.8},
 });

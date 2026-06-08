@@ -26,6 +26,7 @@ export default function DashboardScreen({navigation}: any) {
   const refreshBatteryOpt = useCallback(async () => {
     setBatteryOptOk(await isIgnoringBatteryOptimizations());
   }, []);
+
   useEffect(() => {
     refreshBatteryOpt();
   }, [refreshBatteryOpt]);
@@ -38,6 +39,7 @@ export default function DashboardScreen({navigation}: any) {
       ]);
       return;
     }
+
     setBusy(true);
     try {
       if (workerState.running) {
@@ -46,6 +48,14 @@ export default function DashboardScreen({navigation}: any) {
         const perms = await requestCorePermissions();
         if (!perms.sms) {
           Alert.alert('SMS ruxsati kerak', 'SEND_SMS berilmasa har bir job xato deb belgilanadi.');
+          return;
+        }
+        if (!perms.notifications) {
+          Alert.alert(
+            'Notification ruxsati kerak',
+            "Background worker ko'rinib turishi uchun notification ruxsatini bering.",
+          );
+          return;
         }
         await start();
       }
@@ -88,7 +98,7 @@ export default function DashboardScreen({navigation}: any) {
             tintColor={colors.muted}
           />
         }>
-        <Text style={styles.hello}>Salom, {member?.memberName || 'foydalanuvchi'} 👋</Text>
+        <Text style={styles.hello}>Salom, {member?.memberName || 'foydalanuvchi'}</Text>
 
         <SectionTitle>Xabarlar</SectionTitle>
         <View style={styles.grid}>
@@ -98,7 +108,7 @@ export default function DashboardScreen({navigation}: any) {
             </View>
           ))}
           {!d && !stats.isLoading ? (
-            <Text style={styles.muted}>Statistikani yuklab bo‘lmadi.</Text>
+            <Text style={styles.muted}>Statistikani yuklab bo'lmadi.</Text>
           ) : null}
         </View>
 
@@ -110,22 +120,19 @@ export default function DashboardScreen({navigation}: any) {
         ) : null}
         {s.permissionDenied ? (
           <View style={styles.bannerWarn}>
-            <Text style={styles.bannerText}>SEND_SMS rad etilgan — joblar xato deb belgilanmoqda.</Text>
+            <Text style={styles.bannerText}>SEND_SMS rad etilgan. Joblar xato deb belgilanmoqda.</Text>
           </View>
         ) : null}
         {!batteryOptOk ? (
           <TouchableOpacity style={styles.bannerWarn} onPress={onFixBatteryOpt}>
             <Text style={styles.bannerText}>
-              Batareya optimizatsiyasi yoqilgan — ishonchli ishlash uchun o‘chiring (bosing).
+              Batareya optimizatsiyasi yoqilgan. Ishonchli ishlash uchun o'chiring (bosing).
             </Text>
           </TouchableOpacity>
         ) : null}
 
         <Card style={{marginTop: spacing.md}}>
-          <KeyValueRow
-            label="Qurilma"
-            value={config?.deviceName ?? 'Tanlanmagan'}
-          />
+          <KeyValueRow label="Qurilma" value={config?.deviceName ?? 'Tanlanmagan'} />
           <KeyValueRow
             label="Holat"
             value={<StatusPill label={s.status} tone={s.status === 'ONLINE' ? 'success' : 'neutral'} />}
@@ -133,26 +140,21 @@ export default function DashboardScreen({navigation}: any) {
           <KeyValueRow label="Yuborildi (sessiya)" value={s.counters.sent} tint={colors.success} />
           <KeyValueRow label="Xato (sessiya)" value={s.counters.failed} tint={colors.danger} />
           <KeyValueRow label="Jarayonda" value={s.counters.inProgress} tint={colors.primary} />
-          <KeyValueRow label="Limit" value={`${config?.sendLimitPerMinute ?? '—'} / daqiqa`} />
-          <KeyValueRow label="Oxirgi so‘rov" value={s.lastPollAt ? formatRelative(new Date(s.lastPollAt)) : '—'} />
+          <KeyValueRow label="Limit" value={`${config?.sendLimitPerMinute ?? '?'} / daqiqa`} />
+          <KeyValueRow label="Oxirgi so'rov" value={s.lastPollAt ? formatRelative(new Date(s.lastPollAt)) : '?'} />
           {s.lastError ? <KeyValueRow label="Oxirgi xato" value={s.lastError} tint={colors.danger} /> : null}
         </Card>
 
         <Text style={styles.fabHint}>
           {config
             ? s.running
-              ? 'Worker ishlamoqda — to‘xtatish uchun pastdagi tugmani bosing.'
-              : 'Worker to‘xtagan — boshlash uchun pastdagi ▶ tugmani bosing.'
-            : 'SMS yuborish uchun avval qurilma tanlang (Qurilmalar bo‘limi).'}
+              ? "Worker ishlamoqda. To'xtatish uchun pastdagi tugmani bosing."
+              : "Worker to'xtagan. Boshlash uchun pastdagi tugmani bosing."
+            : "SMS yuborish uchun avval qurilma tanlang (Qurilmalar bo'limi)."}
         </Text>
       </ScrollView>
 
-      <WorkerFab
-        running={s.running}
-        busy={busy}
-        disabled={!config}
-        onPress={onToggleWorker}
-      />
+      <WorkerFab running={s.running} busy={busy} disabled={!config} onPress={onToggleWorker} />
     </View>
   );
 }
