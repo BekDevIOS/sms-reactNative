@@ -39,7 +39,7 @@ export default function MySubscriptionScreen() {
           <Text style={styles.meta}>Boshlangan: {formatDate(sub.data.startsAt)}</Text>
           <Text style={styles.meta}>Tugaydi: {sub.data.expiresAt ? formatDate(sub.data.expiresAt) : 'Cheksiz'}</Text>
           <Text style={styles.meta}>Kunlik SMS: {formatLimit(sub.data.dailySmsLimit)}</Text>
-          <Text style={styles.meta}>Qurilma limiti: {formatLimit(sub.data.deviceLimit)}</Text>
+          <Text style={styles.meta}>Yuboruvchi telefon: 1 ta</Text>
         </Card>
       ) : (
         <EmptyState title="Faol obuna yo‘q" hint="Tarif tanlash uchun administrator bilan bog‘laning." />
@@ -53,7 +53,7 @@ export default function MySubscriptionScreen() {
             <Text style={styles.price}>{formatPrice(p.price, p.currency)}</Text>
           </View>
           {p.description ? <Text style={styles.meta}>{p.description}</Text> : null}
-          <Text style={styles.meta}>Kunlik SMS: {formatLimit(p.dailySmsLimit)} · Qurilma: {formatLimit(p.deviceLimit)}</Text>
+          <Text style={styles.meta}>Kunlik SMS: {formatLimit(p.dailySmsLimit)} · Telefon: 1 ta</Text>
           {p.features?.map((f, i) => (
             <Text key={i} style={styles.feature}>• {f}</Text>
           ))}

@@ -16,7 +16,6 @@ export default function AdminPlansScreen() {
   const [editing, setEditing] = useState<Plan | null>(null);
   const [price, setPrice] = useState('');
   const [daily, setDaily] = useState('');
-  const [devices, setDevices] = useState('');
   const [duration, setDuration] = useState('');
   const [active, setActive] = useState(true);
 
@@ -24,7 +23,6 @@ export default function AdminPlansScreen() {
     setEditing(p);
     setPrice(p.price?.toString() ?? '');
     setDaily(p.dailySmsLimit?.toString() ?? '');
-    setDevices(p.deviceLimit?.toString() ?? '');
     setDuration(p.durationDays?.toString() ?? '');
     setActive(p.isActive);
   };
@@ -38,7 +36,7 @@ export default function AdminPlansScreen() {
     try {
       await update.mutate({
         code: editing.code,
-        data: {price: num(price), dailySmsLimit: num(daily), deviceLimit: num(devices), durationDays: num(duration), isActive: active},
+        data: {price: num(price), dailySmsLimit: num(daily), deviceLimit: 1, durationDays: num(duration), isActive: active},
       });
       setEditing(null);
     } catch (e) {
@@ -67,7 +65,7 @@ export default function AdminPlansScreen() {
               <StatusPill label={item.isActive ? 'Faol' : 'O‘chiq'} tone={item.isActive ? 'success' : 'neutral'} />
             </View>
             <Text style={styles.meta}>{formatPrice(item.price, item.currency)}</Text>
-            <Text style={styles.meta}>Kunlik SMS: {formatLimit(item.dailySmsLimit)} · Qurilma: {formatLimit(item.deviceLimit)}</Text>
+            <Text style={styles.meta}>Kunlik SMS: {formatLimit(item.dailySmsLimit)} · Telefon: 1 ta</Text>
             <Button title="Tahrirlash" variant="outline" onPress={() => open(item)} style={{marginTop: spacing.md}} />
           </Card>
         )}
@@ -76,7 +74,6 @@ export default function AdminPlansScreen() {
       <AppModal visible={!!editing} title={editing ? `${editing.name} — tahrirlash` : ''} onClose={() => setEditing(null)}>
         <Input label="Narx (bo‘sh = kelishuv)" value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="0" />
         <Input label="Kunlik SMS limiti (bo‘sh = cheksiz)" value={daily} onChangeText={setDaily} keyboardType="numeric" />
-        <Input label="Qurilma limiti (bo‘sh = cheksiz)" value={devices} onChangeText={setDevices} keyboardType="numeric" />
         <Input label="Muddat (kun, bo‘sh = cheksiz)" value={duration} onChangeText={setDuration} keyboardType="numeric" />
         <SwitchRow label="Faol" value={active} onValueChange={setActive} />
         <Button title="Saqlash" onPress={onSave} loading={update.isLoading} style={{marginTop: spacing.xl}} />
