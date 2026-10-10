@@ -4,7 +4,15 @@ import {useAppState} from '../../state/AppState';
 import {useQuery} from '../../api/queryClient';
 import {MemberStats} from '../../api/types';
 import {requestCorePermissions} from '../../permissions';
-import {getSimCards, isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations, SimCard} from '../../sms/DirectSms';
+import {
+  clearLastCrash,
+  getLastCrash,
+  getSimCards,
+  isIgnoringBatteryOptimizations,
+  NativeCrash,
+  requestIgnoreBatteryOptimizations,
+  SimCard,
+} from '../../sms/DirectSms';
 import {Button, Card, KeyValueRow, SectionTitle, StatusPill} from '../../components/ui/primitives';
 import {Select} from '../../components/ui/form';
 import {StatCard} from '../../components/ui/StatCard';
@@ -18,6 +26,7 @@ export default function DashboardScreen({navigation}: any) {
   const [batteryOptOk, setBatteryOptOk] = useState(true);
   const [sims, setSims] = useState<SimCard[]>([]);
   const [loadingSims, setLoadingSims] = useState(false);
+  const [lastCrash, setLastCrash] = useState<NativeCrash | null>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -31,6 +40,7 @@ export default function DashboardScreen({navigation}: any) {
 
   useEffect(() => {
     refreshBatteryOpt();
+    getLastCrash().then(setLastCrash);
   }, [refreshBatteryOpt]);
 
   const loadSims = useCallback(async (): Promise<SimCard[]> => {
@@ -125,6 +135,30 @@ export default function DashboardScreen({navigation}: any) {
         <Text style={styles.hello}>Salom, {member?.memberName || 'foydalanuvchi'}</Text>
 
         <SectionTitle>Yuboruvchi telefon</SectionTitle>
+        {lastCrash ? (
+          <TouchableOpacity
+            style={styles.bannerDanger}
+            onPress={() =>
+              Alert.alert(
+                'Oldingi yopilish diagnostikasi',
+                `${new Date(lastCrash.at).toLocaleString()}\n\n${lastCrash.trace.slice(0, 1800)}`,
+                [
+                  {text: 'Yopish', style: 'cancel'},
+                  {
+                    text: 'Tozalash',
+                    onPress: async () => {
+                      await clearLastCrash();
+                      setLastCrash(null);
+                    },
+                  },
+                ],
+              )
+            }>
+            <Text style={styles.bannerText}>
+              Ilova oldin kutilmaganda yopilgan. Diagnostikani ko‘rish uchun bosing.
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         {s.needsRePair ? (
           <View style={styles.bannerDanger}>
             <Text style={styles.bannerText}>Token rad etildi (401). Qurilmani qaytadan ulang.</Text>

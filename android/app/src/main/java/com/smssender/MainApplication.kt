@@ -34,6 +34,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    CrashDiagnostics.install(this)
     loadReactNative(this)
   }
 }

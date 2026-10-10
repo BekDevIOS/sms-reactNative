@@ -5,6 +5,8 @@ interface DirectSmsNative {
   getSimCards(): Promise<SimCard[]>;
   isIgnoringBatteryOptimizations(): Promise<boolean>;
   requestIgnoreBatteryOptimizations(): Promise<boolean>;
+  getLastCrash(): Promise<NativeCrash | null>;
+  clearLastCrash(): Promise<boolean>;
 }
 
 const native: DirectSmsNative | undefined = NativeModules.DirectSms;
@@ -20,6 +22,11 @@ export interface SimCard {
   slotIndex: number;
   carrierName: string;
   displayName: string;
+}
+
+export interface NativeCrash {
+  at: number;
+  trace: string;
 }
 
 export async function getSimCards(): Promise<SimCard[]> {
@@ -75,5 +82,28 @@ export async function requestIgnoreBatteryOptimizations(): Promise<void> {
     await native.requestIgnoreBatteryOptimizations();
   } catch {
     // Ignored — the settings screen simply may not have opened.
+  }
+}
+
+/** Returns the previous uncaught native/JS-thread crash recorded before Android closed the process. */
+export async function getLastCrash(): Promise<NativeCrash | null> {
+  if (!native) {
+    return null;
+  }
+  try {
+    return await native.getLastCrash();
+  } catch {
+    return null;
+  }
+}
+
+export async function clearLastCrash(): Promise<void> {
+  if (!native) {
+    return;
+  }
+  try {
+    await native.clearLastCrash();
+  } catch {
+    // Diagnostics are best-effort and must never affect the sender worker.
   }
 }

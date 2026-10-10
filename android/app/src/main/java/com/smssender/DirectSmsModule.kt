@@ -251,6 +251,26 @@ class DirectSmsModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
+  /** Exposes the previous fatal exception after the user reopens the app. */
+  @ReactMethod
+  fun getLastCrash(promise: Promise) {
+    val crash = CrashDiagnostics.read(reactContext)
+    if (crash == null) {
+      promise.resolve(null)
+      return
+    }
+    val map = Arguments.createMap()
+    map.putDouble("at", crash.at.toDouble())
+    map.putString("trace", crash.trace)
+    promise.resolve(map)
+  }
+
+  @ReactMethod
+  fun clearLastCrash(promise: Promise) {
+    CrashDiagnostics.clear(reactContext)
+    promise.resolve(true)
+  }
+
   private fun safeUnregister(receiver: BroadcastReceiver) {
     try {
       reactContext.unregisterReceiver(receiver)

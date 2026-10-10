@@ -56,7 +56,6 @@ class Worker {
   private config: AppConfig | null = null;
   private enabled = false;
   private looping = false;
-  private onProgress?: () => void;
   private sleepDone: (() => void) | null = null;
   private readonly stoppedWaiters = new Set<() => void>();
 
@@ -114,10 +113,6 @@ class Worker {
 
   setEnabled(v: boolean): void {
     this.enabled = v;
-  }
-
-  setOnProgress(cb?: () => void): void {
-    this.onProgress = cb;
   }
 
   async waitUntilStopped(timeoutMs = 3000): Promise<void> {
@@ -346,7 +341,6 @@ class Worker {
         result.status === 'FAILED' ? result.failReason ?? 'send_error' : null,
         job.recipientId,
       );
-      this.onProgress?.();
     }
 
     return BUSY_SLEEP_MS;

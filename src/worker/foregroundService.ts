@@ -47,14 +47,10 @@ export function registerForegroundService(): void {
   notifee.registerForegroundService(
     () =>
       new Promise<void>(resolve => {
-        worker.setOnProgress(() => {
-          updateNotification().catch(() => {});
-        });
         worker
           .run()
           .catch(() => {})
           .finally(() => {
-            worker.setOnProgress(undefined);
             resolve();
           });
       }),
