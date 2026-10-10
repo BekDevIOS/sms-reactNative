@@ -92,8 +92,8 @@ android {
         applicationId "com.smssender"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 3
+        versionName "1.1.0"
     }
     signingConfigs {
         debug {
@@ -120,9 +120,7 @@ android {
             manifestPlaceholders = [usesCleartextTraffic: "true"]
         }
         release {
-            // Use the real release key when configured; otherwise fall back to debug
-            // so local release builds still work without the production keystore.
-            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -142,6 +140,17 @@ android {
             matchingFallbacks = ["release"]
             manifestPlaceholders = [usesCleartextTraffic: "false"]
         }
+    }
+}
+
+// Never produce a production artifact with the debug key. devRelease has its
+// own explicit debug signing and is intentionally excluded from this guard.
+gradle.taskGraph.whenReady { taskGraph ->
+    def productionReleaseRequested = taskGraph.allTasks.any { task ->
+        task.path == ":app:packageRelease" || task.path == ":app:bundleRelease"
+    }
+    if (productionReleaseRequested && !hasReleaseSigning) {
+        throw new GradleException("Production release signing is not configured in android/local.properties")
     }
 }
 
