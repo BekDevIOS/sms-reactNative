@@ -1,0 +1,28 @@
+name: novasms-mobile-dev
+
+services:
+  mobile:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: novasms-mobile-dev:local
+    restart: "no"
+    init: true
+    command: ["npm", "start", "--", "--host", "0.0.0.0", "--port", "8081"]
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - gradle_cache:/home/node/.gradle
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 10s
+
+volumes:
+  node_modules:
+  gradle_cache:

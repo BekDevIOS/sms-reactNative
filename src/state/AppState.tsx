@@ -1,4 +1,5 @@
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
+import {BASE_URL} from '@env';
 import {ApiClient} from '../api/client';
 import type {MemberRole, RegisterBody, UpdateMeBody} from '../api/types';
 import {worker, WorkerState} from '../worker/worker';
@@ -16,7 +17,7 @@ import {
   setWorkerEnabled,
 } from '../storage/config';
 
-const PRODUCTION_BASE_URL = 'https://api.carmoa.store';
+const API_BASE_URL = (BASE_URL?.trim() || 'https://api.carmoa.store').replace(/\/+$/, '');
 
 function toMemberAuth(
   baseUrl: string,
@@ -80,16 +81,16 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       await worker.init();
       const rawMember = await loadMemberAuth();
       const rawConfig = await loadConfig();
-      const savedMember = rawMember ? {...rawMember, baseUrl: PRODUCTION_BASE_URL} : null;
-      const savedConfig = rawConfig ? {...rawConfig, baseUrl: PRODUCTION_BASE_URL} : null;
+      const savedMember = rawMember ? {...rawMember, baseUrl: API_BASE_URL} : null;
+      const savedConfig = rawConfig ? {...rawConfig, baseUrl: API_BASE_URL} : null;
 
       if (savedMember) {
-        if (rawMember?.baseUrl !== PRODUCTION_BASE_URL) {
+        if (rawMember?.baseUrl !== API_BASE_URL) {
           await saveMemberAuth(savedMember);
         }
         setMember(savedMember);
       }
-      if (savedConfig && rawConfig?.baseUrl !== PRODUCTION_BASE_URL) {
+      if (savedConfig && rawConfig?.baseUrl !== API_BASE_URL) {
         await saveConfig(savedConfig);
       }
       setConfig(savedConfig);
@@ -109,18 +110,18 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await ApiClient.login(PRODUCTION_BASE_URL, {
+    const res = await ApiClient.login(API_BASE_URL, {
       memberEmail: email,
       memberPassword: password,
     });
-    const auth = toMemberAuth(PRODUCTION_BASE_URL, res.token, res.member);
+    const auth = toMemberAuth(API_BASE_URL, res.token, res.member);
     await saveMemberAuth(auth);
     setMember(auth);
   }, []);
 
   const register = useCallback(async (body: RegisterBody) => {
-    const res = await ApiClient.register(PRODUCTION_BASE_URL, body);
-    const auth = toMemberAuth(PRODUCTION_BASE_URL, res.token, res.member);
+    const res = await ApiClient.register(API_BASE_URL, body);
+    const auth = toMemberAuth(API_BASE_URL, res.token, res.member);
     await saveMemberAuth(auth);
     setMember(auth);
   }, []);
@@ -129,8 +130,8 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     if (!member) {
       return;
     }
-    const me = await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).getMe();
-    const auth = toMemberAuth(PRODUCTION_BASE_URL, member.memberToken, me);
+    const me = await new ApiClient(API_BASE_URL, member.memberToken).getMe();
+    const auth = toMemberAuth(API_BASE_URL, member.memberToken, me);
     await saveMemberAuth(auth);
     setMember(auth);
   }, [member]);
@@ -140,8 +141,8 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       if (!member) {
         return;
       }
-      const me = await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).updateMe(body);
-      const auth = toMemberAuth(PRODUCTION_BASE_URL, member.memberToken, me);
+      const me = await new ApiClient(API_BASE_URL, member.memberToken).updateMe(body);
+      const auth = toMemberAuth(API_BASE_URL, member.memberToken, me);
       await saveMemberAuth(auth);
       setMember(auth);
     },
@@ -152,7 +153,7 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     await stopWorker();
     if (member) {
       try {
-        await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).logout();
+        await new ApiClient(API_BASE_URL, member.memberToken).logout();
       } catch {
         // best-effort
       }
@@ -164,9 +165,9 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
   }, [member]);
 
   const activateDevice = useCallback(async (code: string) => {
-    const res = await ApiClient.claim(PRODUCTION_BASE_URL, code);
+    const res = await ApiClient.claim(API_BASE_URL, code);
     const cfg: AppConfig = {
-      baseUrl: PRODUCTION_BASE_URL,
+      baseUrl: API_BASE_URL,
       token: res.token,
       deviceId: res.device.deviceId,
       deviceName: res.device.name,
@@ -185,7 +186,7 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
       if (!member) {
         throw new Error('Not logged in');
       }
-      const created = await new ApiClient(PRODUCTION_BASE_URL, member.memberToken).createDevice({
+      const created = await new ApiClient(API_BASE_URL, member.memberToken).createDevice({
         name,
         platform: 'ANDROID',
         phone: phone || undefined,
