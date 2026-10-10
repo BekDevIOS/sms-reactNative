@@ -4,7 +4,6 @@ import {useAppState} from '../../state/AppState';
 import {useMutation, useQuery} from '../../api/queryClient';
 import {Device, ListResponse} from '../../api/types';
 import {Button, Card, EmptyState, ErrorState, LoadingState, StatusPill} from '../../components/ui/primitives';
-import {AddFab} from '../../components/ui/layout';
 import {AppModal, ConfirmDialog} from '../../components/ui/AppModal';
 import {Input} from '../../components/ui/form';
 import {deviceStatusLabel, deviceStatusTone} from '../../lib/labels';
@@ -23,7 +22,6 @@ export default function DevicesScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [revokeId, setRevokeId] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const onCreate = async () => {
     if (!name.trim()) {
@@ -40,22 +38,11 @@ export default function DevicesScreen() {
     }
   };
 
-  const onUse = async (d: Device) => {
-    setBusyId(d._id);
-    try {
-      await selectDevice(d.code);
-      Alert.alert('Tayyor', `"${d.name}" worker qurilmasi sifatida tanlandi.`);
-    } catch (e) {
-      Alert.alert('Xatolik', errorMessage(e));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const onReset = async (d: Device) => {
     try {
       const res = await resetCode.mutate(d._id);
-      Alert.alert('Yangi kod', `Yangi ulanish kodi: ${res.code}`);
+      await selectDevice(res.code);
+      Alert.alert('Telefon ulandi', 'Ushbu telefon TezkorSMS yuboruvchisi sifatida ulandi. Endi SIM tanlab yuborishni boshlang.');
     } catch (e) {
       Alert.alert('Xatolik', errorMessage(e));
     }
@@ -77,9 +64,9 @@ export default function DevicesScreen() {
         refreshControl={<RefreshControl refreshing={false} onRefresh={devices.refetch} tintColor={colors.muted} />}
         ListEmptyComponent={
           <EmptyState
-            title="Qurilma yo‘q"
-            hint="SMS yuborish uchun qurilma qo‘shing."
-            action={<Button title="Qurilma qo‘shish" onPress={() => setShowCreate(true)} />}
+            title="Yuboruvchi telefon ulanmagan"
+            hint="Ushbu Android telefonni TezkorSMS hisobiga ulang."
+            action={<Button title="Ushbu telefonni ulash" onPress={() => setShowCreate(true)} />}
           />
         }
         renderItem={({item}) => {
@@ -90,49 +77,46 @@ export default function DevicesScreen() {
                 <Text style={styles.name}>{item.name}</Text>
                 <StatusPill label={deviceStatusLabel[item.status]} tone={deviceStatusTone[item.status]} />
               </View>
-              <Text style={styles.meta}>Kod: {item.code} · {item.sendLimitPerMinute}/daqiqa</Text>
+              <Text style={styles.meta}>Tezlik: {item.sendLimitPerMinute}/daqiqa</Text>
               <Text style={styles.meta}>
                 SIM: {item.simCarrier ? `SIM ${Number(item.simSlotIndex ?? 0) + 1} · ${item.simCarrier}` : 'tanlanmagan'}
               </Text>
               <Text style={styles.meta}>Oxirgi faollik: {formatRelative(item.lastSeenAt)}</Text>
               {isActive ? <Text style={styles.activeBadge}>● Faol worker qurilmasi</Text> : null}
               <View style={styles.actions}>
-                {isActive ? (
-                  <Button title="O‘chirish (worker)" variant="outline" onPress={switchDevice} style={styles.actionBtn} />
-                ) : (
+                {!isActive ? (
                   <Button
-                    title="Tanlash"
-                    onPress={() => onUse(item)}
-                    loading={busyId === item._id}
+                    title="Ushbu telefonni ulash"
+                    onPress={() => onReset(item)}
+                    loading={resetCode.isLoading}
                     style={styles.actionBtn}
                   />
-                )}
-                <Button title="Kodni yangilash" variant="ghost" onPress={() => onReset(item)} style={styles.actionBtn} />
-                <Button title="Bekor qilish" variant="ghost" onPress={() => setRevokeId(item._id)} style={styles.actionBtn} />
+                ) : <Button title="Telefondan chiqish" variant="outline" onPress={switchDevice} style={styles.actionBtn} />}
+                {isActive ? <Button title="Qayta ulash" variant="ghost" onPress={() => onReset(item)} style={styles.actionBtn} /> : null}
+                <Button title="Ulanishni bekor qilish" variant="ghost" onPress={() => setRevokeId(item._id)} style={styles.actionBtn} />
               </View>
             </Card>
           );
         }}
       />
 
-      <AddFab onPress={() => setShowCreate(true)} />
-
-      <AppModal visible={showCreate} title="Qurilma qo‘shish" onClose={() => setShowCreate(false)}>
-        <Input label="Nom" value={name} onChangeText={setName} placeholder="Masalan: Pixel-1" autoCapitalize="none" />
+      <AppModal visible={showCreate} title="Ushbu telefonni ulash" onClose={() => setShowCreate(false)}>
+        <Input label="Telefon nomi" value={name} onChangeText={setName} placeholder="Masalan: Ofis Samsung" autoCapitalize="none" />
         <Input label="Telefon (ixtiyoriy)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+998…" />
-        <Button title="Yaratish" onPress={onCreate} loading={createDevice.isLoading} style={{marginTop: spacing.xl}} />
+        <Button title="Ulash" onPress={onCreate} loading={createDevice.isLoading} style={{marginTop: spacing.xl}} />
       </AppModal>
 
       <ConfirmDialog
         visible={!!revokeId}
-        title="Qurilmani bekor qilish"
-        message="Bu qurilma ulanishi bekor qilinadi. Davom etamizmi?"
+        title="Telefon ulanishini bekor qilish"
+        message="SMS worker to‘xtaydi va telefon qayta ulanmaguncha xabar yubormaydi. Davom etamizmi?"
         destructive
         loading={revoke.isLoading}
         onConfirm={async () => {
           if (revokeId) {
             try {
               await revoke.mutate(revokeId);
+              if (config?.deviceId === revokeId) await switchDevice();
             } catch (e) {
               Alert.alert('Xatolik', errorMessage(e));
             }

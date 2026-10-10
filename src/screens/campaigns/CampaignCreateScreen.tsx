@@ -1,10 +1,10 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useMutation, useQuery} from '../../api/queryClient';
 import {Campaign, CampaignDetail, ContactGroup, Device, ListResponse, Template} from '../../api/types';
 import {Button, SectionTitle} from '../../components/ui/primitives';
-import {Input, Select, SwitchRow} from '../../components/ui/form';
+import {Input} from '../../components/ui/form';
 import {errorMessage} from '../../lib/errors';
 import {smsLength} from '../../lib/sms';
 import {useAppState} from '../../state/AppState';
@@ -24,17 +24,12 @@ export default function CampaignCreateScreen({navigation}: Props) {
   const [message, setMessage] = useState('');
   const [phonesText, setPhonesText] = useState('');
   const [groupIds, setGroupIds] = useState<string[]>([]);
-  const [sendNow, setSendNow] = useState(true);
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [deviceId, setDeviceId] = useState(config?.deviceId ?? '');
 
   const senderDevices = useMemo(
     () => (devices.data?.list ?? []).filter(device => device.status !== 'BLOCKED' && device.pairedAt),
     [devices.data],
   );
-  useEffect(() => {
-    if (!deviceId && senderDevices.length === 1) setDeviceId(senderDevices[0]._id);
-  }, [deviceId, senderDevices]);
+  const senderDevice = senderDevices[0];
   const sms = useMemo(() => smsLength(message), [message]);
 
   const toggleGroup = (id: string) =>
@@ -46,7 +41,7 @@ export default function CampaignCreateScreen({navigation}: Props) {
       .map(s => s.trim())
       .filter(Boolean);
 
-  const onSubmit = async () => {
+  const send = async () => {
     const phones = parsePhones();
     if (!title.trim() || !message.trim()) {
       Alert.alert('To‘ldiring', 'Sarlavha va matn shart.');
@@ -56,8 +51,8 @@ export default function CampaignCreateScreen({navigation}: Props) {
       Alert.alert('Qabul qiluvchi yo‘q', 'Telefon raqamlari yoki guruh tanlang.');
       return;
     }
-    if (!deviceId) {
-      Alert.alert('Qurilma tanlanmagan', 'SMS yuboruvchi telefonni tanlang.');
+    if (!config || !senderDevice) {
+      Alert.alert('Telefon ulanmagan', 'Avval bu telefonni TezkorSMS hisobiga ulang.');
       return;
     }
     try {
@@ -66,14 +61,31 @@ export default function CampaignCreateScreen({navigation}: Props) {
         message: message.trim(),
         phones: phones.length ? phones : undefined,
         groupIds: groupIds.length ? groupIds : undefined,
-        sendNow,
-        deviceId,
-        scheduledAt: !sendNow && scheduledAt.trim() ? scheduledAt.trim() : undefined,
+        sendNow: true,
       })) as CampaignDetail | Campaign;
       navigation.replace('CampaignDetail', {id: res._id});
     } catch (e) {
       Alert.alert('Xatolik', errorMessage(e));
     }
+  };
+
+  const onSubmit = () => {
+    const recipientCount = parsePhones().length + groupIds.reduce(
+      (sum, id) => sum + (groups.data?.find(g => g._id === id)?.count ?? 0),
+      0,
+    );
+    if (!title.trim() || !message.trim() || recipientCount === 0 || !config || !senderDevice) {
+      send();
+      return;
+    }
+    Alert.alert(
+      'Yuborishni tasdiqlang',
+      `${recipientCount} tagacha qabul qiluvchi\n${sms.segments} segmentdan · taxminan ${recipientCount * sms.segments} SMS\n${config.selectedSimCarrier ?? 'SIM tanlanmagan'}`,
+      [
+        {text: 'Orqaga', style: 'cancel'},
+        {text: 'Navbatga qo‘shish', onPress: send},
+      ],
+    );
   };
 
   return (
@@ -82,16 +94,14 @@ export default function CampaignCreateScreen({navigation}: Props) {
       <Input label="Xabar matni" value={message} onChangeText={setMessage} placeholder="SMS matni" multiline />
       <Text style={styles.smsMeta}>{sms.encoding} · {sms.segments} SMS segment · {sms.remaining} belgi qoldi</Text>
 
-      <Select
-        label="Yuboruvchi telefon"
-        value={deviceId || undefined}
-        placeholder="Qurilmani tanlang"
-        options={senderDevices.map(device => ({
-          value: device._id,
-          label: `${device.name} · ${device.status === 'ONLINE' ? 'onlayn' : 'oflayn'}${device.simCarrier ? ` · SIM ${Number(device.simSlotIndex ?? 0) + 1}` : ''}`,
-        }))}
-        onChange={setDeviceId}
-      />
+      <View style={styles.senderCard}>
+        <Text style={styles.senderTitle}>{senderDevice?.name ?? 'Yuboruvchi telefon ulanmagan'}</Text>
+        <Text style={styles.smsMeta}>
+          {senderDevice
+            ? `${senderDevice.status === 'ONLINE' ? 'Onlayn' : 'Oflayn'} · ${config?.selectedSimCarrier ?? 'SIM tanlanmagan'}`
+            : 'Telefon bo‘limidan ushbu telefonni ulang.'}
+        </Text>
+      </View>
 
       {templates.data && templates.data.list.length ? (
         <View style={styles.templates}>
@@ -133,19 +143,8 @@ export default function CampaignCreateScreen({navigation}: Props) {
         </View>
       ) : null}
 
-      <SwitchRow label="Hozir yuborish" value={sendNow} onValueChange={setSendNow} />
-      {!sendNow ? (
-        <Input
-          label="Reja vaqti (ISO: 2026-06-10T09:00)"
-          value={scheduledAt}
-          onChangeText={setScheduledAt}
-          placeholder="2026-06-10T09:00:00.000Z"
-          autoCapitalize="none"
-        />
-      ) : null}
-
       <Button
-        title={sendNow ? `${parsePhones().length + groupIds.reduce((sum, id) => sum + (groups.data?.find(g => g._id === id)?.count ?? 0), 0)} kishiga yuborish` : 'Rejalashtirish'}
+        title={`${parsePhones().length + groupIds.reduce((sum, id) => sum + (groups.data?.find(g => g._id === id)?.count ?? 0), 0)} kishiga yuborish`}
         onPress={onSubmit}
         loading={create.isLoading}
         style={{marginTop: spacing.xl}}
@@ -157,6 +156,8 @@ export default function CampaignCreateScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   flex: {flex: 1, backgroundColor: colors.bg},
   container: {padding: spacing.lg, paddingBottom: 60},
+  senderCard: {backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.lg, marginTop: spacing.lg},
+  senderTitle: {color: colors.text, fontSize: font.md, fontWeight: '700'},
   templates: {marginTop: spacing.md},
   tplLabel: {color: colors.muted, fontSize: font.sm, marginBottom: 6},
   smsMeta: {color: colors.muted, fontSize: font.xs, marginTop: spacing.sm},

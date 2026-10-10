@@ -51,7 +51,7 @@ export default function ProfileScreen() {
           label="Rol"
           value={member ? memberRoleLabel[member.memberRole] ?? member.memberRole : '—'}
         />
-        <KeyValueRow label="Qurilmalar" value={member?.memberDevices ?? 0} />
+        <KeyValueRow label="Yuboruvchi telefon" value={(member?.memberDevices ?? 0) > 0 ? 'Ulangan' : 'Ulanmagan'} />
       </Card>
 
       <Text style={styles.section}>Ma'lumotlarni tahrirlash</Text>

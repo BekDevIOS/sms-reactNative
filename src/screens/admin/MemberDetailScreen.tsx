@@ -65,7 +65,7 @@ export default function MemberDetailScreen({route}: Props) {
         <KeyValueRow label="Email" value={m.memberEmail} />
         <KeyValueRow label="Telefon" value={m.memberPhone || '—'} />
         <KeyValueRow label="Kompaniya" value={m.memberCompanyName || '—'} />
-        <KeyValueRow label="Qurilmalar" value={m.memberDevices} />
+        <KeyValueRow label="Yuboruvchi telefon" value={m.memberDevices ? 'Ulangan' : 'Ulanmagan'} />
         {m.createdAt ? <KeyValueRow label="Ro‘yxatdan o‘tgan" value={formatDate(m.createdAt)} /> : null}
       </Card>
 

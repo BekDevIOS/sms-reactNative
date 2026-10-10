@@ -8,7 +8,7 @@ import {NAV_SECTIONS} from './navConfig';
 import {colors, font, spacing} from '../theme';
 
 export function DrawerContent(props: DrawerContentComponentProps) {
-  const {member, config, isAdmin, logout} = useAppState();
+  const {member, config, logout} = useAppState();
   const activeRoute = props.state.routeNames[props.state.index];
 
   return (
@@ -21,16 +21,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         <View style={styles.logo}>
           <Text style={styles.logoText}>SMS</Text>
         </View>
-        <Text style={styles.device}>{config?.deviceName ?? 'SMSAPP.UZ'}</Text>
+        <Text style={styles.device}>{config?.deviceName ?? 'TezkorSMS'}</Text>
         {member?.memberPhone ? <Text style={styles.sub}>{member.memberPhone}</Text> : null}
         <Text style={styles.sub}>{member?.memberEmail}</Text>
       </LinearGradient>
 
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
         {NAV_SECTIONS.map((section, si) => {
-          if (section.adminOnly && !isAdmin) {
-            return null;
-          }
           return (
             <View key={si} style={styles.section}>
               {section.title ? <Text style={styles.sectionTitle}>{section.title}</Text> : null}

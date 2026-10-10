@@ -46,7 +46,7 @@ export default function LoginScreen({navigation}: Props) {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>SMSAPP.UZ</Text>
+        <Text style={styles.title}>TezkorSMS</Text>
         <Text style={styles.subtitle}>Hisobingiz bilan kiring.</Text>
 
         <Text style={styles.label}>Email</Text>

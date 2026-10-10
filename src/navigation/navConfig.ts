@@ -35,45 +35,31 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     items: [
-      {route: 'Dashboard', label: 'Boshqaruv paneli', icon: 'chart'},
-      {route: 'Campaigns', label: 'Xabarlar', icon: 'send'},
-      {route: 'Contacts', label: 'Kontaktlar', icon: 'contacts'},
-      {route: 'Devices', label: 'Qurilmalar', icon: 'device'},
+      {route: 'Dashboard', label: 'Bosh sahifa', icon: 'chart'},
+      {route: 'Campaigns', label: 'Tezkor SMS va tarix', icon: 'send'},
+      {route: 'Devices', label: 'Ushbu telefon', icon: 'device'},
     ],
   },
   {
-    title: 'Asboblar',
+    title: 'Nazorat',
     items: [
-      {route: 'Templates', label: 'Shablonlar', icon: 'template'},
       {route: 'SmsLogs', label: 'SMS jurnali', icon: 'inbox'},
     ],
   },
   {
     title: 'Hisob',
     items: [
-      {route: 'Subscription', label: 'Obuna', icon: 'credit'},
       {route: 'Profile', label: 'Profil', icon: 'user'},
-    ],
-  },
-  {
-    title: 'Administrator',
-    adminOnly: true,
-    items: [
-      {route: 'AdminDashboard', label: 'Admin panel', icon: 'grid'},
-      {route: 'AdminMembers', label: 'Aʼzolar', icon: 'contacts'},
-      {route: 'AdminPlans', label: 'Tariflar', icon: 'credit'},
-      {route: 'AdminSubscriptions', label: 'Obunalar', icon: 'shield'},
-      {route: 'AdminSmsLogs', label: 'Global SMS jurnali', icon: 'inbox'},
     ],
   },
 ];
 
 /** Drawer header title shown in the React Navigation top bar per route. */
 export const ROUTE_TITLES: Record<DrawerRoute, string> = {
-  Dashboard: 'Boshqaruv paneli',
-  Campaigns: 'Xabarlar',
+  Dashboard: 'Bosh sahifa',
+  Campaigns: 'Tezkor SMS va tarix',
   Contacts: 'Kontaktlar',
-  Devices: 'Qurilmalar',
+  Devices: 'Ushbu telefon',
   Templates: 'Shablonlar',
   AutoReply: 'Avto-javob',
   SmsLogs: 'SMS jurnali',
