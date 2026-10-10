@@ -23,6 +23,9 @@ export interface AppConfig {
   deviceId: string;
   deviceName: string;
   sendLimitPerMinute: number;
+  selectedSimSubscriptionId?: number;
+  selectedSimSlotIndex?: number;
+  selectedSimCarrier?: string;
 }
 
 export interface SessionCounters {

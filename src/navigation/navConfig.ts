@@ -42,12 +42,10 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Avtomatlashtirish',
+    title: 'Asboblar',
     items: [
       {route: 'Templates', label: 'Shablonlar', icon: 'template'},
-      {route: 'AutoReply', label: 'Avto-javob', icon: 'reply'},
       {route: 'SmsLogs', label: 'SMS jurnali', icon: 'inbox'},
-      {route: 'Ussd', label: 'USSD', icon: 'phone', disabled: true},
     ],
   },
   {

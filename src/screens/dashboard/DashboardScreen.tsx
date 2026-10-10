@@ -4,18 +4,21 @@ import {useAppState} from '../../state/AppState';
 import {useQuery} from '../../api/queryClient';
 import {MemberStats} from '../../api/types';
 import {requestCorePermissions} from '../../permissions';
-import {isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations} from '../../sms/DirectSms';
-import {Card, KeyValueRow, SectionTitle, StatusPill} from '../../components/ui/primitives';
+import {getSimCards, isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations, SimCard} from '../../sms/DirectSms';
+import {Button, Card, KeyValueRow, SectionTitle, StatusPill} from '../../components/ui/primitives';
+import {Select} from '../../components/ui/form';
 import {StatCard} from '../../components/ui/StatCard';
 import {WorkerFab} from '../../components/ui/WorkerFab';
 import {formatRelative} from '../../lib/format';
 import {colors, font, spacing} from '../../theme';
 
 export default function DashboardScreen({navigation}: any) {
-  const {config, workerState, start, stop, member} = useAppState();
+  const {config, workerState, start, stop, member, selectSim} = useAppState();
   const stats = useQuery<MemberStats>(c => c.getMyStats(), {tags: ['Stats']});
   const [busy, setBusy] = useState(false);
   const [batteryOptOk, setBatteryOptOk] = useState(true);
+  const [sims, setSims] = useState<SimCard[]>([]);
+  const [loadingSims, setLoadingSims] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -30,6 +33,20 @@ export default function DashboardScreen({navigation}: any) {
   useEffect(() => {
     refreshBatteryOpt();
   }, [refreshBatteryOpt]);
+
+  const loadSims = useCallback(async (): Promise<SimCard[]> => {
+    setLoadingSims(true);
+    try {
+      const active = await getSimCards();
+      setSims(active);
+      return active;
+    } catch {
+      setSims([]);
+      return [];
+    } finally {
+      setLoadingSims(false);
+    }
+  }, []);
 
   const onToggleWorker = async () => {
     if (!config) {
@@ -55,6 +72,18 @@ export default function DashboardScreen({navigation}: any) {
             'Notification ruxsati kerak',
             "Background worker ko'rinib turishi uchun notification ruxsatini bering.",
           );
+          return;
+        }
+        const activeSims = await loadSims();
+        if (!activeSims.length) {
+          Alert.alert('SIM topilmadi', 'Faol SIM karta va READ_PHONE_STATE ruxsatini tekshiring.');
+          return;
+        }
+        const selected = activeSims.find(sim => sim.subscriptionId === config.selectedSimSubscriptionId);
+        if (!selected && activeSims.length === 1) {
+          await selectSim(activeSims[0]);
+        } else if (!selected) {
+          Alert.alert('SIM tanlang', 'Worker’ni boshlashdan oldin qaysi SIM’dan yuborishni tanlang.');
           return;
         }
         await start();
@@ -141,9 +170,54 @@ export default function DashboardScreen({navigation}: any) {
           <KeyValueRow label="Xato (sessiya)" value={s.counters.failed} tint={colors.danger} />
           <KeyValueRow label="Jarayonda" value={s.counters.inProgress} tint={colors.primary} />
           <KeyValueRow label="Limit" value={`${config?.sendLimitPerMinute ?? '?'} / daqiqa`} />
+          <KeyValueRow
+            label="Tanlangan SIM"
+            value={config?.selectedSimCarrier
+              ? `SIM ${Number(config.selectedSimSlotIndex ?? 0) + 1} · ${config.selectedSimCarrier}`
+              : 'Tanlanmagan'}
+          />
           <KeyValueRow label="Oxirgi so'rov" value={s.lastPollAt ? formatRelative(new Date(s.lastPollAt)) : '?'} />
           {s.lastError ? <KeyValueRow label="Oxirgi xato" value={s.lastError} tint={colors.danger} /> : null}
         </Card>
+
+        {config ? (
+          <Card style={{marginTop: spacing.md}}>
+            <Text style={styles.simTitle}>SMS yuboruvchi SIM</Text>
+            {sims.length ? (
+              <Select
+                value={config.selectedSimSubscriptionId != null ? String(config.selectedSimSubscriptionId) : undefined}
+                placeholder="SIM kartani tanlang"
+                options={sims.map(sim => ({
+                  value: String(sim.subscriptionId),
+                  label: `SIM ${sim.slotIndex + 1} · ${sim.carrierName || sim.displayName || 'Noma’lum operator'}`,
+                }))}
+                onChange={value => {
+                  if (s.running) {
+                    Alert.alert('Worker’ni to‘xtating', 'SIM almashtirishdan oldin worker’ni to‘xtating.');
+                    return;
+                  }
+                  const sim = sims.find(item => String(item.subscriptionId) === value);
+                  if (sim) selectSim(sim);
+                }}
+              />
+            ) : (
+              <Button
+                title="SIM kartalarni aniqlash"
+                variant="outline"
+                loading={loadingSims}
+                onPress={async () => {
+                  const perms = await requestCorePermissions();
+                  if (!perms.phone) {
+                    Alert.alert('Ruxsat kerak', 'SIM kartalarni ko‘rish uchun telefon holati ruxsatini bering.');
+                    return;
+                  }
+                  await loadSims();
+                }}
+                style={{marginTop: spacing.md}}
+              />
+            )}
+          </Card>
+        ) : null}
 
         <Text style={styles.fabHint}>
           {config
@@ -170,4 +244,5 @@ const styles = StyleSheet.create({
   bannerWarn: {backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 10, padding: 12, marginTop: spacing.md},
   bannerText: {color: colors.text, fontSize: font.sm, lineHeight: 18},
   fabHint: {color: colors.muted, fontSize: font.xs, marginTop: spacing.lg, lineHeight: 18, paddingRight: 72},
+  simTitle: {color: colors.text, fontSize: font.md, fontWeight: '700'},
 });

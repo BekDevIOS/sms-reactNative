@@ -1,18 +1,22 @@
-import React, {useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useMutation, useQuery} from '../../api/queryClient';
-import {Campaign, CampaignDetail, ContactGroup, ListResponse, Template} from '../../api/types';
+import {Campaign, CampaignDetail, ContactGroup, Device, ListResponse, Template} from '../../api/types';
 import {Button, SectionTitle} from '../../components/ui/primitives';
-import {Input, SwitchRow} from '../../components/ui/form';
+import {Input, Select, SwitchRow} from '../../components/ui/form';
 import {errorMessage} from '../../lib/errors';
+import {smsLength} from '../../lib/sms';
+import {useAppState} from '../../state/AppState';
 import {colors, font, spacing} from '../../theme';
 import type {CampaignsStackParamList} from '../../navigation/types';
 
 type Props = NativeStackScreenProps<CampaignsStackParamList, 'CampaignCreate'>;
 
 export default function CampaignCreateScreen({navigation}: Props) {
+  const {config} = useAppState();
   const groups = useQuery<ContactGroup[]>(c => c.getContactGroups(), {tags: ['ContactGroup']});
+  const devices = useQuery<ListResponse<Device>>(c => c.getDevices(), {tags: ['Device']});
   const templates = useQuery<ListResponse<Template>>(c => c.getTemplates({page: 1, limit: 50}), {tags: ['Template']});
   const create = useMutation((c, body: any) => c.createCampaign(body), {invalidates: ['Campaign', 'Stats']});
 
@@ -22,6 +26,16 @@ export default function CampaignCreateScreen({navigation}: Props) {
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [sendNow, setSendNow] = useState(true);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [deviceId, setDeviceId] = useState(config?.deviceId ?? '');
+
+  const senderDevices = useMemo(
+    () => (devices.data?.list ?? []).filter(device => device.status !== 'BLOCKED' && device.pairedAt),
+    [devices.data],
+  );
+  useEffect(() => {
+    if (!deviceId && senderDevices.length === 1) setDeviceId(senderDevices[0]._id);
+  }, [deviceId, senderDevices]);
+  const sms = useMemo(() => smsLength(message), [message]);
 
   const toggleGroup = (id: string) =>
     setGroupIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
@@ -42,6 +56,10 @@ export default function CampaignCreateScreen({navigation}: Props) {
       Alert.alert('Qabul qiluvchi yo‘q', 'Telefon raqamlari yoki guruh tanlang.');
       return;
     }
+    if (!deviceId) {
+      Alert.alert('Qurilma tanlanmagan', 'SMS yuboruvchi telefonni tanlang.');
+      return;
+    }
     try {
       const res = (await create.mutate({
         title: title.trim(),
@@ -49,6 +67,7 @@ export default function CampaignCreateScreen({navigation}: Props) {
         phones: phones.length ? phones : undefined,
         groupIds: groupIds.length ? groupIds : undefined,
         sendNow,
+        deviceId,
         scheduledAt: !sendNow && scheduledAt.trim() ? scheduledAt.trim() : undefined,
       })) as CampaignDetail | Campaign;
       navigation.replace('CampaignDetail', {id: res._id});
@@ -61,6 +80,18 @@ export default function CampaignCreateScreen({navigation}: Props) {
     <ScrollView style={styles.flex} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Input label="Sarlavha" value={title} onChangeText={setTitle} placeholder="Kampaniya nomi" />
       <Input label="Xabar matni" value={message} onChangeText={setMessage} placeholder="SMS matni" multiline />
+      <Text style={styles.smsMeta}>{sms.encoding} · {sms.segments} SMS segment · {sms.remaining} belgi qoldi</Text>
+
+      <Select
+        label="Yuboruvchi telefon"
+        value={deviceId || undefined}
+        placeholder="Qurilmani tanlang"
+        options={senderDevices.map(device => ({
+          value: device._id,
+          label: `${device.name} · ${device.status === 'ONLINE' ? 'onlayn' : 'oflayn'}${device.simCarrier ? ` · SIM ${Number(device.simSlotIndex ?? 0) + 1}` : ''}`,
+        }))}
+        onChange={setDeviceId}
+      />
 
       {templates.data && templates.data.list.length ? (
         <View style={styles.templates}>
@@ -93,7 +124,9 @@ export default function CampaignCreateScreen({navigation}: Props) {
                 key={g._id}
                 style={[styles.chip, groupIds.includes(g._id) && styles.chipOn]}
                 onPress={() => toggleGroup(g._id)}>
-                <Text style={[styles.chipText, groupIds.includes(g._id) && styles.chipTextOn]}>{g.name}</Text>
+                <Text style={[styles.chipText, groupIds.includes(g._id) && styles.chipTextOn]}>
+                  {g.name} ({g.count ?? 0})
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -111,7 +144,12 @@ export default function CampaignCreateScreen({navigation}: Props) {
         />
       ) : null}
 
-      <Button title="Yaratish" onPress={onSubmit} loading={create.isLoading} style={{marginTop: spacing.xl}} />
+      <Button
+        title={sendNow ? `${parsePhones().length + groupIds.reduce((sum, id) => sum + (groups.data?.find(g => g._id === id)?.count ?? 0), 0)} kishiga yuborish` : 'Rejalashtirish'}
+        onPress={onSubmit}
+        loading={create.isLoading}
+        style={{marginTop: spacing.xl}}
+      />
     </ScrollView>
   );
 }
@@ -121,6 +159,7 @@ const styles = StyleSheet.create({
   container: {padding: spacing.lg, paddingBottom: 60},
   templates: {marginTop: spacing.md},
   tplLabel: {color: colors.muted, fontSize: font.sm, marginBottom: 6},
+  smsMeta: {color: colors.muted, fontSize: font.xs, marginTop: spacing.sm},
   groupsWrap: {marginTop: spacing.sm},
   chips: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},
   chip: {backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6},

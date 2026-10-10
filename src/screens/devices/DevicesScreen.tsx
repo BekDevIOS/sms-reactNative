@@ -91,6 +91,9 @@ export default function DevicesScreen() {
                 <StatusPill label={deviceStatusLabel[item.status]} tone={deviceStatusTone[item.status]} />
               </View>
               <Text style={styles.meta}>Kod: {item.code} · {item.sendLimitPerMinute}/daqiqa</Text>
+              <Text style={styles.meta}>
+                SIM: {item.simCarrier ? `SIM ${Number(item.simSlotIndex ?? 0) + 1} · ${item.simCarrier}` : 'tanlanmagan'}
+              </Text>
               <Text style={styles.meta}>Oxirgi faollik: {formatRelative(item.lastSeenAt)}</Text>
               {isActive ? <Text style={styles.activeBadge}>● Faol worker qurilmasi</Text> : null}
               <View style={styles.actions}>

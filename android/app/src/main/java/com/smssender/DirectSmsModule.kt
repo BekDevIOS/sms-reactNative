@@ -1,5 +1,6 @@
 package com.smssender
 
+import android.Manifest
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -11,8 +12,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.telephony.SmsManager
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -41,16 +44,49 @@ class DirectSmsModule(private val reactContext: ReactApplicationContext) :
   private val counter = AtomicInteger(0)
 
   @Suppress("DEPRECATION")
-  private fun getSmsManager(): SmsManager =
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        reactContext.getSystemService(SmsManager::class.java)
-      } else {
-        SmsManager.getDefault()
-      }
+  private fun getSmsManager(subscriptionId: Int?): SmsManager {
+    if (subscriptionId != null && subscriptionId >= 0) {
+      return SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+    }
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      reactContext.getSystemService(SmsManager::class.java)
+    } else {
+      SmsManager.getDefault()
+    }
+  }
 
-  private fun simAbsent(): Boolean =
+  /** Returns active SIM subscriptions so the user can explicitly choose SIM 1 / SIM 2. */
+  @ReactMethod
+  fun getSimCards(promise: Promise) {
+    if (reactContext.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+      promise.reject("phone_permission_denied", "READ_PHONE_STATE permission is required")
+      return
+    }
+    try {
+      val manager = reactContext.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+      val result = Arguments.createArray()
+      for (info in manager.activeSubscriptionInfoList.orEmpty().sortedBy { it.simSlotIndex }) {
+        val item = Arguments.createMap()
+        item.putInt("subscriptionId", info.subscriptionId)
+        item.putInt("slotIndex", info.simSlotIndex)
+        item.putString("carrierName", info.carrierName?.toString() ?: "")
+        item.putString("displayName", info.displayName?.toString() ?: "")
+        result.pushMap(item)
+      }
+      promise.resolve(result)
+    } catch (e: Exception) {
+      promise.reject("sim_read_error", "Unable to read active SIM cards: ${e.message}", e)
+    }
+  }
+
+  private fun simAbsent(subscriptionId: Int?): Boolean =
       try {
-        val tm = reactContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+        val base = reactContext.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+        val tm = if (subscriptionId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          base?.createForSubscriptionId(subscriptionId)
+        } else {
+          base
+        }
         tm?.simState == TelephonyManager.SIM_STATE_ABSENT
       } catch (e: Exception) {
         // If we cannot read SIM state, don't block the send — let the radio report failure.
@@ -67,19 +103,19 @@ class DirectSmsModule(private val reactContext: ReactApplicationContext) :
       }
 
   @ReactMethod
-  fun sendSms(phone: String, message: String, promise: Promise) {
+  fun sendSms(phone: String, message: String, subscriptionId: Double?, promise: Promise) {
     if (phone.isBlank()) {
       promise.reject("invalid_number", "Empty phone number")
       return
     }
-    if (simAbsent()) {
+    if (simAbsent(subscriptionId?.toInt())) {
       promise.reject("no_sim", "No SIM card present")
       return
     }
 
     val sms: SmsManager =
         try {
-          getSmsManager()
+          getSmsManager(subscriptionId?.toInt())
         } catch (e: Exception) {
           promise.reject("send_error", "Unable to obtain SmsManager: ${e.message}", e)
           return

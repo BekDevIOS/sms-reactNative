@@ -2,6 +2,7 @@ import React, {createContext, useCallback, useContext, useEffect, useState} from
 import {BASE_URL} from '@env';
 import {ApiClient} from '../api/client';
 import type {MemberRole, RegisterBody, UpdateMeBody} from '../api/types';
+import type {SimCard} from '../sms/DirectSms';
 import {worker, WorkerState} from '../worker/worker';
 import {startWorker, stopWorker} from '../worker/foregroundService';
 import {
@@ -63,6 +64,7 @@ interface AppContextValue {
   selectDevice: (code: string) => Promise<void>;
   createDevice: (name: string, phone?: string) => Promise<void>;
   switchDevice: () => Promise<void>;
+  selectSim: (sim: SimCard) => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
 }
@@ -203,6 +205,19 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
     setConfig(null);
   }, []);
 
+  const selectSim = useCallback(async (sim: SimCard) => {
+    if (!config) return;
+    const next: AppConfig = {
+      ...config,
+      selectedSimSubscriptionId: sim.subscriptionId,
+      selectedSimSlotIndex: sim.slotIndex,
+      selectedSimCarrier: sim.carrierName || sim.displayName || `SIM ${sim.slotIndex + 1}`,
+    };
+    await saveConfig(next);
+    await worker.configure(next);
+    setConfig(next);
+  }, [config]);
+
   const start = useCallback(async () => {
     await startWorker();
   }, []);
@@ -229,6 +244,7 @@ export function AppStateProvider({children}: {children: React.ReactNode}) {
         selectDevice,
         createDevice,
         switchDevice,
+        selectSim,
         start,
         stop,
       }}>

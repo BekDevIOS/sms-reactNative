@@ -260,6 +260,9 @@ class Worker {
       batteryLevel,
       networkType,
       appVersion: getAppVersion(),
+      simSubscriptionId: this.config?.selectedSimSubscriptionId,
+      simSlotIndex: this.config?.selectedSimSlotIndex,
+      simCarrier: this.config?.selectedSimCarrier,
     });
     this.patch({lastHeartbeatAt: Date.now(), status: 'ONLINE'});
   }
@@ -319,7 +322,11 @@ class Worker {
       });
       await saveCounters(this.state.counters);
 
-      const result = await sendSms(job.phone, job.message);
+      const result = await sendSms(
+        job.phone,
+        job.message,
+        this.config?.selectedSimSubscriptionId,
+      );
       this.recordSend();
 
       const report: ReportBody = {

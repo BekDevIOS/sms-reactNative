@@ -112,6 +112,10 @@ export interface DeviceSummary {
   status: DeviceStatus;
   platform?: DevicePlatform;
   phone?: string;
+  pairedAt?: string;
+  simSubscriptionId?: number;
+  simSlotIndex?: number;
+  simCarrier?: string;
   sendLimitPerMinute: number;
   batteryLevel?: number;
   networkType?: string;
@@ -132,6 +136,9 @@ export interface Device {
   platform?: DevicePlatform;
   phone?: string;
   carrier?: string;
+  simSubscriptionId?: number;
+  simSlotIndex?: number;
+  simCarrier?: string;
   networkType?: string;
   batteryLevel?: number;
   appVersion?: string;
@@ -157,6 +164,7 @@ export interface CreateCampaignBody {
   message: string;
   scheduledAt?: string;
   sendNow?: boolean;
+  deviceId?: string;
   contactIds?: string[];
   groupIds?: string[];
   phones?: string[];
@@ -167,6 +175,7 @@ export interface Campaign {
   memberId: string;
   title: string;
   message: string;
+  senderDeviceId?: string;
   status: CampaignStatus;
   scheduledAt?: string;
   totalCount: number;
@@ -430,6 +439,9 @@ export interface HeartbeatBody {
   batteryLevel?: number;
   networkType?: string;
   appVersion?: string;
+  simSubscriptionId?: number;
+  simSlotIndex?: number;
+  simCarrier?: string;
 }
 
 export interface HeartbeatResponse {

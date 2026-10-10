@@ -5,6 +5,7 @@
  */
 
 import {ApiClient, InvalidCodeError, UnauthorizedError} from '../src/api/client';
+import {smsLength} from '../src/lib/sms';
 
 function mockFetch(status: number, body: unknown) {
   // @ts-ignore - replacing global fetch for the test
@@ -39,5 +40,16 @@ describe('ApiClient', () => {
     const client = new ApiClient('http://x:4008', 'tok');
     const res = await client.report({recipientId: 'r1', status: 'SENT'});
     expect(res.success).toBe(false);
+  });
+});
+
+describe('smsLength', () => {
+  it('uses GSM multipart limits for plain Latin text', () => {
+    expect(smsLength('a'.repeat(161))).toMatchObject({encoding: 'GSM-7', segments: 2});
+  });
+
+  it('uses Unicode limits for Uzbek characters outside GSM-7', () => {
+    expect(smsLength('o‘quvchi')).toMatchObject({encoding: 'Unicode', segments: 1});
+    expect(smsLength('‘'.repeat(71))).toMatchObject({encoding: 'Unicode', segments: 2});
   });
 });

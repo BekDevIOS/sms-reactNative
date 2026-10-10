@@ -1,7 +1,8 @@
 import {NativeModules} from 'react-native';
 
 interface DirectSmsNative {
-  sendSms(phone: string, message: string): Promise<{resultCode: number; parts: number}>;
+  sendSms(phone: string, message: string, subscriptionId: number | null): Promise<{resultCode: number; parts: number}>;
+  getSimCards(): Promise<SimCard[]>;
   isIgnoringBatteryOptimizations(): Promise<boolean>;
   requestIgnoreBatteryOptimizations(): Promise<boolean>;
 }
@@ -14,19 +15,35 @@ export interface SmsSendResult {
   providerResponse?: Record<string, unknown>;
 }
 
+export interface SimCard {
+  subscriptionId: number;
+  slotIndex: number;
+  carrierName: string;
+  displayName: string;
+}
+
+export async function getSimCards(): Promise<SimCard[]> {
+  if (!native) return [];
+  return native.getSimCards();
+}
+
 /**
  * Sends one SMS via the native module. Never throws — failures are returned as a
  * FAILED result with a short `failReason`, so the worker can always report.
  */
-export async function sendSms(phone: string, message: string): Promise<SmsSendResult> {
+export async function sendSms(
+  phone: string,
+  message: string,
+  subscriptionId?: number,
+): Promise<SmsSendResult> {
   if (!native) {
     return {status: 'FAILED', failReason: 'native_module_missing'};
   }
   try {
-    const res = await native.sendSms(phone, message);
+    const res = await native.sendSms(phone, message, subscriptionId ?? null);
     return {
       status: 'SENT',
-      providerResponse: {resultCode: res.resultCode, parts: res.parts},
+      providerResponse: {resultCode: res.resultCode, parts: res.parts, subscriptionId: subscriptionId ?? null},
     };
   } catch (e: any) {
     // Native promise rejections surface as { code, message }.
