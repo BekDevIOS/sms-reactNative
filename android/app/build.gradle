@@ -129,6 +129,19 @@ android {
             // Production must use HTTPS only — no cleartext.
             manifestPlaceholders = [usesCleartextTraffic: "false"]
         }
+        // Standalone, Metro-free build for testing against the isolated VPS
+        // development API. The application id suffix lets it coexist with the
+        // production app on the same phone.
+        devRelease {
+            initWith release
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            matchingFallbacks = ["release"]
+            manifestPlaceholders = [usesCleartextTraffic: "false"]
+        }
     }
 }
 

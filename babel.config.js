@@ -5,7 +5,9 @@ module.exports = {
       'module:react-native-dotenv',
       {
         moduleName: '@env',
-        path: '.env',
+        // CI/dev-release can select a separate endpoint without modifying the
+        // normal local .env file: ENVFILE=.env.dev ./gradlew assembleDevRelease
+        path: process.env.ENVFILE || '.env',
         safe: false,
         allowUndefined: true,
       },

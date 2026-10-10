@@ -59,6 +59,30 @@ Or distribute the APK file directly. On first launch grant the **SMS** and
 **notifications** permissions, then log in over HTTPS, claim the device with a
 pairing code, and start the worker.
 
+## Standalone dev release for a physical phone
+
+The `devRelease` variant bundles JavaScript like a release build, uses the
+isolated VPS development API, and installs as `com.smssender.dev` under the
+name **NovaSMS Dev**. It can coexist with the production app and does not need
+Metro, USB, or `adb reverse`.
+
+Start the optional HTTPS dev tunnel from the backend repository, copy the URL
+from its logs, then build:
+
+```bash
+docker compose -f compose.dev.yml --profile phone up -d tunnel
+docker compose -f compose.dev.yml logs tunnel
+
+cp .env.dev.example .env.dev
+# Set BASE_URL to the https://....trycloudflare.com URL from the log.
+npm run android:dev-release
+# -> android/app/build/outputs/apk/devRelease/app-devRelease.apk
+```
+
+The tunnel exposes only the isolated development API/database. A Quick Tunnel
+URL is temporary and can change if its container is recreated; update
+`.env.dev` and rebuild the dev APK after such a change.
+
 ## Notes
 - `versionCode` must be incremented in `android/app/build.gradle` for every new
   release that installs over a previous one.

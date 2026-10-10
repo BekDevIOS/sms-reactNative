@@ -76,4 +76,5 @@ yarn-error.log
 
 # Local env (backend URL/IP)
 .env
+.env.dev
 .runtime/
